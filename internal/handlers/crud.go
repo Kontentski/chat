@@ -37,24 +37,24 @@ func SendMessage(c *gin.Context) {
 
 	query := `INSERT INTO messages (sender_id, content, chat_room_id, is_dm) 
             VALUES ($1, $2, $3, $4) RETURNING id, timestamp`
-	err := storage.DB.QueryRow(context.Background(), query, messages.SenderID, messages.Content, messages.ChatRoomID, messages.IsDM).Scan(&messages.ID, &messages.Timestamp)
+	err := storage.DB.QueryRow(context.Background(), query, messages.SenderID, messages.Content, messages.ChatRoomID, messages.IsDM).Scan(&messages.MessageID, &messages.Timestamp)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Message sent successfully", "message_id": messages.ID, "timestamp": messages.Timestamp})
+	c.JSON(http.StatusOK, gin.H{"message": "Message sent successfully", "message_id": messages.MessageID, "timestamp": messages.Timestamp})
 }
 
 func GetMessages(c *gin.Context) {
 	chatRoomID := c.Param("chatRoomID")
 
 	query := `
-	SELECT m.id, m.sender_id, u.username, u.name, m.content, m.timestamp, m.chat_room_id, m.is_dm 
+	SELECT m.message_id, m.sender_id, u.username, u.name, m.content, m.timestamp, m.chat_room_id, m.is_dm 
 	FROM messages m 
 	JOIN users u ON m.sender_id = u.id 
 	WHERE m.chat_room_id = $1
-	ORDER BY m.id ASC
+	ORDER BY m.message_id ASC
 `
 	rows, err := storage.DB.Query(context.Background(), query, chatRoomID)
 	if err != nil {
@@ -66,7 +66,7 @@ func GetMessages(c *gin.Context) {
 	var messages []models.Messages
 	for rows.Next() {
 		var msg models.Messages
-		if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Sender.Username, &msg.Sender.Name, &msg.Content, &msg.Timestamp, &msg.ChatRoomID, &msg.IsDM); err != nil {
+		if err := rows.Scan(&msg.MessageID, &msg.SenderID, &msg.Sender.Username, &msg.Sender.Name, &msg.Content, &msg.Timestamp, &msg.ChatRoomID, &msg.IsDM); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

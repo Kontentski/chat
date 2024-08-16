@@ -120,11 +120,39 @@ func getChatRoomIDs(chatRooms []models.ChatRooms) []uint {
 	return ids
 }
 
+// saveMessageToDB saves a message to the database with an incremented message ID unique to the chat room.
 func saveMessageToDB(msg models.Messages) error {
-	query := `INSERT INTO messages (sender_id, content, chat_room_id, is_dm) 
-            VALUES ($1, $2, $3, $4) RETURNING id, timestamp`
-	err := storage.DB.QueryRow(context.Background(), query, msg.SenderID, msg.Content, msg.ChatRoomID, msg.IsDM).Scan(&msg.ID, &msg.Timestamp)
-	return err
+	// Begin a transaction to ensure atomic operation
+	tx, err := storage.DB.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.Background())
+	// Retrieve the highest message ID for the chat room
+	var lastMessageID uint
+	query := `
+		SELECT COALESCE(MAX(message_id), 0)
+		FROM messages
+		WHERE chat_room_id = $1
+	`
+	err = tx.QueryRow(context.Background(), query, msg.ChatRoomID).Scan(&lastMessageID)
+	if err != nil {
+		return err
+	}
+	// Increment the message ID
+	msg.MessageID = lastMessageID + 1
+	// Insert the new message
+	insertQuery := `INSERT INTO messages (message_id, sender_id, content, chat_room_id, is_dm, timestamp) 
+                    VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING timestamp`
+	err = tx.QueryRow(context.Background(), insertQuery, msg.MessageID, msg.SenderID, msg.Content, msg.ChatRoomID, msg.IsDM).Scan(&msg.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Commit the transaction
+	if err = tx.Commit(context.Background()); err != nil {
+		return err
+	}
+	return nil
 }
 
 // getUserChatRooms retrieves the chat rooms the user is part of

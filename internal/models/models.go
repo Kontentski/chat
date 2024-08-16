@@ -14,7 +14,7 @@ type Users struct {
 }
 
 type Messages struct {
-	ID         uint      `json:"id"`
+	MessageID  uint      `json:"message_id"`
 	SenderID   uint      `json:"sender_id"`
 	Content    string    `json:"content"`
 	Timestamp  time.Time `json:"timestamp"`
@@ -35,9 +35,3 @@ type ChatRoomMembers struct {
 	UserID     uint `json:"user_id"`
 }
 
-type ReadMessages struct {
-	UserID     uint      `json:"user_id"`
-	ChatRoomID uint      `json:"chat_room_id"`
-	MessageID  uint      `json:"message_id"`
-	ReadAt     time.Time `json:"read_at"`
-}
