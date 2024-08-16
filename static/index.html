@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #chat-box {
+            border: 1px solid #ccc;
+            height: 300px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        #message-form {
+            display: flex;
+            gap: 10px;
+        }
+        #message-input {
+            flex: 1;
+        }
+        #chat-room-list {
+            margin-bottom: 20px;
+        }
+    </style>
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <h1>Chat Room</h1>
+    <div id="user-info">
+        <p id="user-username">Username: </p>
+        <p id="user-name">Name: </p>
+    </div>
+    <div id="chat-room-list">
+        <h2>Chat Rooms</h2>
+        <ul id="chat-room-list-items"></ul>
+    </div>
+    <div id="chat-box">
+        <p>Welcome! Select a chat room to start.</p>
+    </div>
+    <form id="message-form">
+        <input type="text" id="message-input" placeholder="Type your message here...">
+        <input type="submit" id="send-button" value="Send"></input>
+    </form>
+</body>
+</html>

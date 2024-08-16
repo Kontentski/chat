@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <style>
+        body {
+            display: flex;
+            font-family: Arial, sans-serif;
+        }
+        #chatRooms {
+            width: 200px;
+            border-right: 1px solid #ccc;
+            padding: 10px;
+        }
+        #messages {
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+            height: 80vh;
+        }
+        .message {
+            margin-bottom: 10px;
+        }
+        .message .sender {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatRooms"></div>
+    <div id="messages"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
