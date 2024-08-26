@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kontentski/chat/internal/models"
@@ -48,33 +51,61 @@ func SendMessage(c *gin.Context) {
 
 func GetMessages(c *gin.Context) {
 	chatRoomID := c.Param("chatRoomID")
+	userID := c.Query("userID")
+
+	// Log the parameters
+	log.Printf("chatRoomID: %s, userID: %s", chatRoomID, userID)
 
 	query := `
-	SELECT m.message_id, m.sender_id, u.username, u.name, m.content, m.timestamp, m.chat_room_id, m.is_dm 
-	FROM messages m 
-	JOIN users u ON m.sender_id = u.id 
-	WHERE m.chat_room_id = $1
-	ORDER BY m.message_id ASC
-`
-	rows, err := storage.DB.Query(context.Background(), query, chatRoomID)
+    SELECT m.message_id, m.sender_id, u.username, u.name, m.content, m.timestamp, m.chat_room_id, m.is_dm,
+    COALESCE(r.read_at, '1970-01-01T00:00:00Z') AS read_at
+    FROM messages m
+    JOIN users u ON m.sender_id = u.id
+    LEFT JOIN read_messages r ON m.message_id = r.message_id AND r.user_id = $1 AND m.chat_room_id = r.chat_room_id
+    WHERE m.chat_room_id = $2
+    ORDER BY m.timestamp ASC
+    `
+
+	rows, err := storage.DB.Query(context.Background(), query, userID, chatRoomID)
 	if err != nil {
+		log.Printf("Query error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	defer rows.Close()
 
+	log.Println("Query executed successfully")
+
 	var messages []models.Messages
+
 	for rows.Next() {
 		var msg models.Messages
-		if err := rows.Scan(&msg.MessageID, &msg.SenderID, &msg.Sender.Username, &msg.Sender.Name, &msg.Content, &msg.Timestamp, &msg.ChatRoomID, &msg.IsDM); err != nil {
+		var readAt sql.NullTime
+		if err := rows.Scan(&msg.MessageID, &msg.SenderID, &msg.Sender.Username, &msg.Sender.Name, &msg.Content, &msg.Timestamp, &msg.ChatRoomID, &msg.IsDM, &readAt); err != nil {
+			log.Printf("Row scan error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
+		if readAt.Valid {
+			msg.ReadAt = readAt.Time.Format(time.RFC3339)
+		} else {
+			msg.ReadAt = "1970-01-01T00:00:00Z" // Default for unread messages
+		}
+
 		messages = append(messages, msg)
 	}
 
+	if err := rows.Err(); err != nil {
+		log.Printf("Rows iteration error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	log.Printf("Messages: %v", messages)
 	c.JSON(http.StatusOK, messages)
 }
+
 
 func GetChatRooms(c *gin.Context) {
 	query := `SELECT id, name, description, type FROM chat_rooms`

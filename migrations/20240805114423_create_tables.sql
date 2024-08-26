@@ -40,6 +40,17 @@ CREATE TABLE IF NOT EXISTS chat_room_members (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS read_messages (
+    user_id INT,
+    message_id INT,
+    chat_room_id INT,
+    read_at TIMESTAMP NULL,
+    PRIMARY KEY (user_id, message_id, chat_room_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (message_id, chat_room_id) REFERENCES messages(message_id, chat_room_id) ON DELETE CASCADE,
+    FOREIGN KEY (chat_room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE
+);
+
 -- +goose StatementEnd
 
 -- +goose Down
@@ -51,4 +62,7 @@ DROP TABLE messages;
 DROP TABLE chat_rooms;
 
 DROP TABLE chat_room_members;
+
+DROP TABLE read_messages;
+
 -- +goose StatementEnd

@@ -27,7 +27,7 @@ func main() {
 
     // Message endpoints
     r.POST("/messages", handlers.SendMessage)
-    r.GET("/messages/:chatRoomID", handlers.GetMessages)
+	r.GET("/messages/:chatRoomID", handlers.GetMessages)
 
 
     // Chat room endpoints

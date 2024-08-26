@@ -20,6 +20,7 @@ type Messages struct {
 	Timestamp  time.Time `json:"timestamp"`
 	ChatRoomID uint      `json:"chat_room_id"`
 	IsDM       bool      `json:"is_dm"`
+	ReadAt     string    `json:"read_at"`
 	Sender     Users     `json:"sender"`
 }
 
@@ -35,3 +36,9 @@ type ChatRoomMembers struct {
 	UserID     uint `json:"user_id"`
 }
 
+type ReadMessages struct {
+	UserID     uint   `json:"user_id"`
+	MessageID  uint   `json:"message_id"`
+	ChatRoomID uint   `json:"chat_room_id"`
+	ReadAt     string `json:"read_at"`
+}

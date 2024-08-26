@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/kontentski/chat/internal/models"
@@ -22,7 +23,10 @@ var (
 		userID uint
 		name   string
 	})
-	broadcast = make(chan models.Messages, 100) // Broadcast channel
+	broadcast  = make(chan models.Messages, 100) // Broadcast channel
+	pingPeriod = time.Second * 60
+	writeWait  = 10 * time.Second                // Time allowed to write a message to the client
+
 )
 
 // HandleWebSocket handles WebSocket requests
@@ -33,6 +37,29 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	conn.SetPingHandler(func(appData string) error {
+		log.Printf("Received ping: %s", appData)
+		return conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(writeWait))
+	})
+
+	conn.SetCloseHandler(func(code int, text string) error {
+		log.Printf("Connection closed: %v %v", code, text)
+		return nil
+	})
+
+	// Ping the client periodically
+	go func() {
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
+				log.Printf("Error sending ping: %v", err)
+				return
+			}
+		}
+	}()
 
 	// Get the username from query parameters
 	username := r.URL.Query().Get("username")
