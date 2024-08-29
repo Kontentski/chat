@@ -37,7 +37,7 @@ func readMessages(conn *websocket.Conn) {
 		if messageID, ok := data["message_id"].(float64); ok {
 			chatRoomID := uint(data["chat_room_id"].(float64))
 			log.Printf("Processing read receipt: message_id=%v, chat_room_id=%v", messageID, chatRoomID)
-			
+
 			err := markMessageAsRead(clientData.userID, uint(messageID), chatRoomID)
 			if err != nil {
 				log.Printf("Error marking message as read: %v", err)
@@ -73,7 +73,6 @@ func readMessages(conn *websocket.Conn) {
 		broadcast <- msg
 	}
 }
-
 
 func markMessageAsRead(userID uint, messageID uint, chatRoomID uint) error {
 	query := `
@@ -118,35 +117,61 @@ func handleMessages() {
 	for msg := range broadcast {
 		log.Println("Handling broadcast message")
 
-		// Fetch the sender's details from the database
-		var sender models.Users
-		err := storage.DB.QueryRow(context.Background(), "SELECT id, username, name FROM users WHERE id = $1", msg.SenderID).Scan(&sender.ID, &sender.Username, &sender.Name)
-		if err != nil {
-			log.Printf("Error fetching sender details: %v", err)
-			continue
-		}
-		msg.Sender = sender
+		if msg.Type == "delete" {
+			// Handle deletion event
+			for client, clientData := range clients {
+				accessibleChatRooms, err := getUserChatRooms(clientData.userID)
+				if err != nil {
+					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
+					continue
+				}
 
-		// Fetch the chat rooms the user has access to
-		for client, clientData := range clients {
-			accessibleChatRooms, err := getUserChatRooms(clientData.userID)
+				chatRoomIDs := getChatRoomIDs(accessibleChatRooms)
+				if contains(chatRoomIDs, msg.ChatRoomID) {
+					// Send deletion event to the client
+					deletionMsg := models.Messages{
+						MessageID:  msg.MessageID,
+						ChatRoomID: msg.ChatRoomID,
+						SenderID:   msg.SenderID,
+						Type:  "delete",
+					}
+					if err := client.WriteJSON(deletionMsg); err != nil {
+						log.Printf("Error broadcasting message: %v", err)
+						client.Close()
+						delete(clients, client)
+					}
+				}
+			}
+		} else {
+			// Handle regular messages ( i think the next 8 rows not needed here)
+			var sender models.Users
+			err := storage.DB.QueryRow(context.Background(), "SELECT id, username, name FROM users WHERE id = $1", msg.SenderID).Scan(&sender.ID, &sender.Username, &sender.Name)
 			if err != nil {
-				log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
+				log.Printf("Error fetching sender details: %v", err)
 				continue
 			}
+			msg.Sender = sender
 
-			// Check if the chat room is accessible to the user
-			chatRoomIDs := getChatRoomIDs(accessibleChatRooms)
-			if contains(chatRoomIDs, msg.ChatRoomID) {
-				if err := client.WriteJSON(msg); err != nil {
-					log.Printf("Error broadcasting message: %v", err)
-					client.Close()
-					delete(clients, client)
+			for client, clientData := range clients {
+				accessibleChatRooms, err := getUserChatRooms(clientData.userID)
+				if err != nil {
+					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
+					continue
+				}
+
+				chatRoomIDs := getChatRoomIDs(accessibleChatRooms)
+				if contains(chatRoomIDs, msg.ChatRoomID) {
+					if err := client.WriteJSON(msg); err != nil {
+						log.Printf("Error broadcasting message: %v", err)
+						client.Close()
+						delete(clients, client)
+					}
 				}
 			}
 		}
 	}
 }
+
 
 // Utility function to check if a slice contains a value
 func contains(slice []uint, value uint) bool {
@@ -219,7 +244,6 @@ func saveMessageToDB(msg *models.Messages) error {
 	log.Println("Transaction committed successfully")
 	return nil
 }
-
 
 // getUserChatRooms retrieves the chat rooms the user is part of
 func getUserChatRooms(userID uint) ([]models.ChatRooms, error) {

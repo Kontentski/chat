@@ -28,6 +28,8 @@ func main() {
     // Message endpoints
     r.POST("/messages", handlers.SendMessage)
 	r.GET("/messages/:chatRoomID", handlers.GetMessages)
+	r.DELETE("/messages/:messageID", handlers.DeleteMessage)
+
 
 
     // Chat room endpoints

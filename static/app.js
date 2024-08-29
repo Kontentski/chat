@@ -19,6 +19,7 @@ function connectWebSocket() {
 
     socket.onmessage = function(event) {
         const data = JSON.parse(event.data);
+        console.log('Received data:', data);  // Log the received data
 
         if (data.token) {
             handleToken(data.token);
@@ -26,6 +27,8 @@ function connectWebSocket() {
             handleUserID(data);
         } else if (Array.isArray(data)) {
             handleChatRooms(data);
+        } else if (data.type === "delete") {
+            handleDeleteMessage(data);
         } else if (data.chat_room_id === currentChatRoomID) {
             handleIncomingMessage(data);
         } else {
@@ -43,6 +46,35 @@ function connectWebSocket() {
         console.error('WebSocket error:', error);
     };
 }
+
+// message deletion
+function handleDeleteMessage(data) {
+    removeMessageFromUI(data.message_id, data.chat_room_id); 
+}
+
+//remove a message from the UI
+function removeMessageFromUI(messageID, chatRoomID) {
+    // Select the chat room list item that matches the chatRoomID
+    const chatRoomListItem = document.querySelector(`li[data-chat-room-id="${chatRoomID}"]`);
+
+    if (chatRoomListItem) {
+        // Use the chat room ID to find the associated chat box container
+        const chatBox = document.getElementById('chat-box');
+        
+        // Ensure that the chatBox contains messages for the chatRoomID
+        if (chatBox) {
+            const messageElement = chatBox.querySelector(`[data-message-id="${messageID}"]`);
+            
+            if (messageElement) {
+                console.log('message deleted');
+                messageElement.remove();
+            }
+        }
+    } else {
+        console.error('Chat room not found for ID:', chatRoomID);
+    }
+}
+
 
 
 function reconnectWebSocket() {
@@ -187,6 +219,27 @@ function fetchMessageHistory(chatRoomID) {
     .catch(error => console.error('Error fetching message history:', error));
 }
 
+function deleteMessage(messageID, chatRoomID) {
+    const token = localStorage.getItem('token');
+    const userID = localStorage.getItem('userID'); // Retrieve userID from local storage
+
+    fetch(`/messages/${messageID}?chat_room_id=${chatRoomID}&user_id=${userID}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+        // No body is needed if all parameters are in the URL
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Failed to delete message: ${response.statusText}`);
+        }
+        console.log('Message deleted successfully');
+    })
+    .catch(error => console.error('Error deleting message:', error));
+}
+
 // Send a message to the server
 document.getElementById('message-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -212,7 +265,6 @@ const sentReadReceipts = new Set();
 
 // Function to send a read receipt for a specific message
 function sendReadReceipt(messageID) {
-    console.log('Sending read receipt with messageID:', messageID);
     if (userID !== undefined && currentChatRoomID !== null) {
         const readReceipt = {
             message_id: parseInt(messageID, 10),  // Ensure it's an integer
@@ -259,12 +311,24 @@ function appendMessageToChatBox(message) {
     const messageElement = document.createElement('div');
     messageElement.textContent = `${message.sender.name}: ${message.content}`;
 
+    messageElement.dataset.messageId = message.message_id;
+    messageElement.dataset.readAt = message.read_at;  
+
     if (message.read_at !== '1970-01-01T00:00:00Z') {
         messageElement.style.backgroundColor = '#e0ffe0'; // Highlight read messages
     }
 
-    messageElement.dataset.messageId = message.message_id;
-    messageElement.dataset.readAt = message.read_at;  
+    // Add delete button if the message was sent by the current user
+    if (message.sender_id === userID) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.className = 'delete-button';
+        deleteButton.addEventListener('click', () => deleteMessage(message.message_id, message.chat_room_id));
+        messageElement.appendChild(deleteButton);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+
     chatBox.appendChild(messageElement);
 
     console.log('Appending message to chat box:', message);
@@ -282,16 +346,29 @@ chatBox.addEventListener('scroll', function() {
     checkReadReceipts();
 });
 
-// Adjust scroll position based on read messages
+// Adjust scroll position based on read and unread messages
 function adjustScrollPosition(messages) {
+    // Find the index of the last read message
+    const lastReadMessageIndex = messages.slice().reverse().findIndex(msg => msg.read_at !== '1970-01-01T00:00:00Z');
+    const adjustedLastReadIndex = lastReadMessageIndex !== -1 ? messages.length - 1 - lastReadMessageIndex : -1;
+
     // Find the index of the first unread message
     const firstUnreadMessageIndex = messages.findIndex(msg => msg.read_at === '1970-01-01T00:00:00Z');
-    
-    if (firstUnreadMessageIndex !== -1) {
-        // Scroll to the first unread message
+
+    if (adjustedLastReadIndex !== -1 && firstUnreadMessageIndex !== -1) {
+        // Calculate the midpoint between the last read and first unread message
+        const midpointIndex = Math.floor((adjustedLastReadIndex + firstUnreadMessageIndex) / 2);
+        const element = Array.from(chatBox.children)[midpointIndex];
+
+        if (element) {
+            chatBox.scrollTop = element.offsetTop - chatBox.clientHeight / 2;
+        }
+    } else if (firstUnreadMessageIndex !== -1) {
+        // If only unread messages are present, scroll to the first unread message
         const element = Array.from(chatBox.children)[firstUnreadMessageIndex];
         if (element) {
-            chatBox.scrollTop = element.offsetTop;
+            console.log('scroll to first unread message half');
+            chatBox.scrollTop = element.offsetTop - chatBox.clientHeight / 2;
         }
     } else {
         // If all messages are read, scroll to the bottom

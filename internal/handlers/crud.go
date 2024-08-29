@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -102,10 +103,8 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Messages: %v", messages)
 	c.JSON(http.StatusOK, messages)
 }
-
 
 func GetChatRooms(c *gin.Context) {
 	query := `SELECT id, name, description, type FROM chat_rooms`
@@ -127,4 +126,87 @@ func GetChatRooms(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, chatRooms)
+}
+
+func DeleteMessage(c *gin.Context) {
+    messageIDStr := c.Param("messageID")
+    chatRoomIDStr := c.Query("chat_room_id")
+    userIDStr := c.Query("user_id")
+
+	// Validate the request parameters
+	if messageIDStr == "" || chatRoomIDStr == "" || userIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required parameters"})
+		return
+	}
+
+	// Convert messageID and chatRoomID from string to int
+	messageIDInt, err := strconv.Atoi(messageIDStr)
+	if err != nil {
+		log.Printf("Invalid messageID: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid messageID"})
+		return
+	}
+	chatRoomIDInt, err := strconv.Atoi(chatRoomIDStr)
+	if err != nil {
+		log.Printf("Invalid chatRoomID: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatRoomID"})
+		return
+	}
+
+	userIDInt, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Printf("Invalid chatRoomID: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatRoomID"})
+		return
+	}
+
+	// Convert int to uint
+	messageID := uint(messageIDInt)
+	chatRoomID := uint(chatRoomIDInt)
+	userID := uint(userIDInt)
+
+	// Ensure user has permission to delete the message
+	if !isUserInChatRoom(uint(userID), uint(chatRoomID)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "User not authorized to delete message"})
+		return
+	}
+
+	// Begin a transaction to ensure atomic operation
+	tx, err := storage.DB.Begin(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(context.Background())
+		} else {
+			tx.Commit(context.Background())
+		}
+	}()
+
+	// Delete the message
+	deleteQuery := `DELETE FROM messages WHERE message_id = $1 AND chat_room_id = $2`
+	_, err = tx.Exec(context.Background(), deleteQuery, messageID, chatRoomID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message"})
+		return
+	}
+
+	// Commit the transaction
+	err = tx.Commit(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	// Broadcast the deletion to other connected clients
+	broadcast <- models.Messages{
+		MessageID:  messageID,
+		ChatRoomID: chatRoomID,
+		SenderID:   userID,
+		Type: "delete",
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
 }

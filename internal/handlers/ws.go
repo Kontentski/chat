@@ -43,24 +43,31 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(writeWait))
 	})
 
+	done := make(chan struct{})
 	conn.SetCloseHandler(func(code int, text string) error {
 		log.Printf("Connection closed: %v %v", code, text)
+		close(done) // Signal the ping goroutine to stop
 		return nil
 	})
-
+	
 	// Ping the client periodically
 	go func() {
 		ticker := time.NewTicker(pingPeriod)
 		defer ticker.Stop()
-
-		for range ticker.C {
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
-				log.Printf("Error sending ping: %v", err)
+	
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
+					log.Printf("Error sending ping: %v", err)
+					return
+				}
+			case <-done: // Use a 'done' channel to signal when the connection is closed
 				return
 			}
 		}
 	}()
-
+	
 	// Get the username from query parameters
 	username := r.URL.Query().Get("username")
 	if username == "" {
