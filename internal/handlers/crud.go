@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kontentski/chat/internal/auth"
 	"github.com/kontentski/chat/internal/models"
 	"github.com/kontentski/chat/internal/storage"
 )
@@ -106,32 +107,10 @@ func GetMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, messages)
 }
 
-func GetChatRooms(c *gin.Context) {
-	query := `SELECT id, name, description, type FROM chat_rooms`
-	rows, err := storage.DB.Query(context.Background(), query)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer rows.Close()
-
-	var chatRooms []models.ChatRooms
-	for rows.Next() {
-		var chatRoom models.ChatRooms
-		if err := rows.Scan(&chatRoom.ID, &chatRoom.Name, &chatRoom.Description, &chatRoom.Type); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		chatRooms = append(chatRooms, chatRoom)
-	}
-
-	c.JSON(http.StatusOK, chatRooms)
-}
-
 func DeleteMessage(c *gin.Context) {
-    messageIDStr := c.Param("messageID")
-    chatRoomIDStr := c.Query("chat_room_id")
-    userIDStr := c.Query("user_id")
+	messageIDStr := c.Param("messageID")
+	chatRoomIDStr := c.Query("chat_room_id")
+	userIDStr := c.Query("user_id")
 
 	// Validate the request parameters
 	if messageIDStr == "" || chatRoomIDStr == "" || userIDStr == "" {
@@ -205,8 +184,59 @@ func DeleteMessage(c *gin.Context) {
 		MessageID:  messageID,
 		ChatRoomID: chatRoomID,
 		SenderID:   userID,
-		Type: "delete",
+		Type:       "delete",
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
+}
+
+// getUserChatRooms retrieves the chat rooms the user is part of
+func GetUserChatRooms(c *gin.Context) {
+	// Assuming you're retrieving the userID from the session
+	session, err := auth.Store.Get(c.Request, "auth-session")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session"})
+		return
+	}
+
+	userID, ok := session.Values["userID"].(uint)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Call the original function to fetch chat rooms
+	chatRooms, err := fetchUserChatRooms(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch chat rooms"})
+		return
+	}
+
+	c.JSON(http.StatusOK, chatRooms)
+}
+
+func fetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
+	query := `
+	SELECT cr.id, cr.name, cr.description, cr.type
+	FROM chat_rooms cr
+	JOIN chat_room_members crm ON cr.id = crm.chat_room_id
+	WHERE crm.user_id = $1
+	`
+
+	rows, err := storage.DB.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chatRooms []models.ChatRooms
+	for rows.Next() {
+		var room models.ChatRooms
+		if err := rows.Scan(&room.ID, &room.Name, &room.Description, &room.Type); err != nil {
+			return nil, err
+		}
+		chatRooms = append(chatRooms, room)
+	}
+
+	return chatRooms, nil
 }

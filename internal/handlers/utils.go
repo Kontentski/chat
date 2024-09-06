@@ -4,11 +4,32 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/kontentski/chat/internal/models"
 	"github.com/kontentski/chat/internal/storage"
 )
+
+func handleConnection(conn *websocket.Conn) {
+    conn.SetPongHandler(func(string) error {
+        conn.SetReadDeadline(time.Now().Add(pongWait))
+        return nil
+    })
+
+    // Handle ping/pong in a separate goroutine
+    go func() {
+        ticker := time.NewTicker(pingPeriod)
+        defer ticker.Stop()
+
+        for range ticker.C {
+            conn.SetWriteDeadline(time.Now().Add(writeWait))
+            if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+                return // Exit the goroutine if there is an error
+            }
+        }
+    }()
+}
 
 func readMessages(conn *websocket.Conn) {
 	defer func() {
@@ -53,7 +74,7 @@ func readMessages(conn *websocket.Conn) {
 		}
 
 		// Log the parsed message
-		log.Printf("Received message: %+v", msg)
+		log.Printf("Received message")
 
 		// Ensure user is a member of the chat room
 		if !isUserInChatRoom(clientData.userID, msg.ChatRoomID) {
@@ -67,7 +88,7 @@ func readMessages(conn *websocket.Conn) {
 		}
 
 		// Log the broadcast
-		log.Printf("Broadcasting message: %+v", msg)
+		log.Printf("Broadcasting message")
 
 		// Broadcast the message
 		broadcast <- msg
@@ -115,12 +136,12 @@ func isUserInChatRoom(userID uint, chatRoomID uint) bool {
 
 func handleMessages() {
 	for msg := range broadcast {
-		log.Println("Handling broadcast message")
 
 		if msg.Type == "delete" {
+			log.Println("Handling delete message")
 			// Handle deletion event
 			for client, clientData := range clients {
-				accessibleChatRooms, err := getUserChatRooms(clientData.userID)
+				accessibleChatRooms, err := fetchUserChatRooms(clientData.userID)
 				if err != nil {
 					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
 					continue
@@ -133,7 +154,7 @@ func handleMessages() {
 						MessageID:  msg.MessageID,
 						ChatRoomID: msg.ChatRoomID,
 						SenderID:   msg.SenderID,
-						Type:  "delete",
+						Type:       "delete",
 					}
 					if err := client.WriteJSON(deletionMsg); err != nil {
 						log.Printf("Error broadcasting message: %v", err)
@@ -143,6 +164,8 @@ func handleMessages() {
 				}
 			}
 		} else {
+			log.Println("Handling a message")
+
 			// Handle regular messages ( i think the next 8 rows not needed here)
 			var sender models.Users
 			err := storage.DB.QueryRow(context.Background(), "SELECT id, username, name FROM users WHERE id = $1", msg.SenderID).Scan(&sender.ID, &sender.Username, &sender.Name)
@@ -153,7 +176,7 @@ func handleMessages() {
 			msg.Sender = sender
 
 			for client, clientData := range clients {
-				accessibleChatRooms, err := getUserChatRooms(clientData.userID)
+				accessibleChatRooms, err := fetchUserChatRooms(clientData.userID)
 				if err != nil {
 					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
 					continue
@@ -171,7 +194,6 @@ func handleMessages() {
 		}
 	}
 }
-
 
 // Utility function to check if a slice contains a value
 func contains(slice []uint, value uint) bool {
@@ -229,8 +251,6 @@ func saveMessageToDB(msg *models.Messages) error {
 	msg.MessageID = lastMessageID + 1
 	log.Printf("New message ID: %d", msg.MessageID)
 
-	// Insert the new message
-	log.Printf("Inserting new message: %+v", *msg)
 	insertQuery := `INSERT INTO messages (message_id, sender_id, content, chat_room_id, is_dm, timestamp) 
                     VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING timestamp`
 	err = tx.QueryRow(context.Background(), insertQuery, msg.MessageID, msg.SenderID, msg.Content, msg.ChatRoomID, msg.IsDM).Scan(&msg.Timestamp)
@@ -243,31 +263,4 @@ func saveMessageToDB(msg *models.Messages) error {
 	// Commit the transaction
 	log.Println("Transaction committed successfully")
 	return nil
-}
-
-// getUserChatRooms retrieves the chat rooms the user is part of
-func getUserChatRooms(userID uint) ([]models.ChatRooms, error) {
-	query := `
-	SELECT cr.id, cr.name, cr.description, cr.type
-	FROM chat_rooms cr
-	JOIN chat_room_members crm ON cr.id = crm.chat_room_id
-	WHERE crm.user_id = $1
-`
-
-	rows, err := storage.DB.Query(context.Background(), query, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var chatRooms []models.ChatRooms
-	for rows.Next() {
-		var room models.ChatRooms
-		if err := rows.Scan(&room.ID, &room.Name, &room.Description, &room.Type); err != nil {
-			return nil, err
-		}
-		chatRooms = append(chatRooms, room)
-	}
-
-	return chatRooms, nil
 }
