@@ -206,7 +206,7 @@ func GetUserChatRooms(c *gin.Context) {
 	}
 
 	// Call the original function to fetch chat rooms
-	chatRooms, err := fetchUserChatRooms(userID)
+	chatRooms, err := FetchUserChatRooms(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch chat rooms"})
 		return
@@ -215,7 +215,7 @@ func GetUserChatRooms(c *gin.Context) {
 	c.JSON(http.StatusOK, chatRooms)
 }
 
-func fetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
+func FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
 	query := `
 	SELECT cr.id, cr.name, cr.description, cr.type
 	FROM chat_rooms cr

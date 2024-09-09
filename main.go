@@ -7,6 +7,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/kontentski/chat/internal/auth"
 	"github.com/kontentski/chat/internal/handlers"
+	"github.com/kontentski/chat/internal/middleware"
 	"github.com/kontentski/chat/internal/storage"
 )
 
@@ -19,7 +20,7 @@ func main() {
 	r := gin.Default()
 
 
-	r.Static("/home", "./static")
+	r.Static("/homepage", "./homepage")
 
 	// WebSocket endpoint
 	r.GET("/ws", func(c *gin.Context) {
@@ -29,10 +30,13 @@ func main() {
 	// Authentication routes
 	r.GET("/auth", handlers.AuthHandler)
 	r.GET("/auth/callback", handlers.CallbackHandler)
+	r.GET("/auth/register/", handlers.RegisterHandler)
+	r.POST("/auth/register", handlers.RegisterPostHandler)
 	r.GET("/auth/logout", handlers.LogoutHandler)
 
 
 
+	r.Use(middleware.AuthMiddleware(auth.Store))
 	r.POST("/users", handlers.CreateUser)
 
     // Message endpoints

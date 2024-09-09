@@ -12,23 +12,23 @@ import (
 )
 
 func handleConnection(conn *websocket.Conn) {
-    conn.SetPongHandler(func(string) error {
-        conn.SetReadDeadline(time.Now().Add(pongWait))
-        return nil
-    })
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
 
-    // Handle ping/pong in a separate goroutine
-    go func() {
-        ticker := time.NewTicker(pingPeriod)
-        defer ticker.Stop()
+	// Handle ping/pong in a separate goroutine
+	go func() {
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
 
-        for range ticker.C {
-            conn.SetWriteDeadline(time.Now().Add(writeWait))
-            if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-                return // Exit the goroutine if there is an error
-            }
-        }
-    }()
+		for range ticker.C {
+			conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return // Exit the goroutine if there is an error
+			}
+		}
+	}()
 }
 
 func readMessages(conn *websocket.Conn) {
@@ -141,7 +141,7 @@ func handleMessages() {
 			log.Println("Handling delete message")
 			// Handle deletion event
 			for client, clientData := range clients {
-				accessibleChatRooms, err := fetchUserChatRooms(clientData.userID)
+				accessibleChatRooms, err := FetchUserChatRooms(clientData.userID)
 				if err != nil {
 					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
 					continue
@@ -176,7 +176,7 @@ func handleMessages() {
 			msg.Sender = sender
 
 			for client, clientData := range clients {
-				accessibleChatRooms, err := fetchUserChatRooms(clientData.userID)
+				accessibleChatRooms, err := FetchUserChatRooms(clientData.userID)
 				if err != nil {
 					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
 					continue
