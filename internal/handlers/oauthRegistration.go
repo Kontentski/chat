@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kontentski/chat/internal/auth"
+	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/models"
-	"github.com/kontentski/chat/internal/storage"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -75,7 +75,7 @@ func RegisterPostHandler(c *gin.Context) {
 
 func UsernameExists(username string) (bool, error) {
 	var count int
-	err := storage.DB.QueryRow(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username).Scan(&count)
+	err := database.DB.QueryRow(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username).Scan(&count)
 	return count > 0, err
 }
 
@@ -104,6 +104,6 @@ func hashPassword(password string) string {
 
 func UpdateUser(user *models.Users) error {
 	query := `UPDATE users SET username = $1, password = $2 WHERE id = $3`
-	_, err := storage.DB.Exec(context.Background(), query, user.Username, user.Password, user.ID)
+	_, err := database.DB.Exec(context.Background(), query, user.Username, user.Password, user.ID)
 	return err
 }

@@ -6,19 +6,22 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/kontentski/chat/internal/auth"
+	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/handlers"
 	"github.com/kontentski/chat/internal/middleware"
 	"github.com/kontentski/chat/internal/storage"
 )
 
 func main() {
-	storage.Init()
-	storage.RunMigrations()
-
+	database.Init()
+	database.RunMigrations()
+	userStorage := &storage.UserQuery{
+		DB: database.DB,
+	}
+	authStorage := &storage.RealAuth{}
 	auth.Init()
 
 	r := gin.Default()
-
 
 	r.Static("/homepage", "./homepage")
 
@@ -32,22 +35,17 @@ func main() {
 	r.GET("/auth/callback", handlers.CallbackHandler)
 	r.GET("/auth/register/", handlers.RegisterHandler)
 	r.POST("/auth/register", handlers.RegisterPostHandler)
-	r.GET("/auth/logout", handlers.LogoutHandler)
-
-
+	r.POST("/auth/logout", handlers.LogoutHandler)
 
 	r.Use(middleware.AuthMiddleware(auth.Store))
-	r.POST("/users", handlers.CreateUser)
+	r.POST("/users", handlers.CreateUser(userStorage))
 
-    // Message endpoints
-    r.POST("/messages", handlers.SendMessage)
-	r.GET("/messages/:chatRoomID", handlers.GetMessages)
-	r.DELETE("/messages/:messageID", handlers.DeleteMessage)
+	// Message endpoints
+	r.GET("/messages/:chatRoomID", handlers.GetMessages(userStorage, authStorage))
+	r.DELETE("/messages/:messageID", handlers.DeleteMessage(userStorage))
 
-
-
-    // Chat room endpoints
-    r.GET("/api/chatrooms", handlers.GetUserChatRooms)
+	// Chat room endpoints
+	r.GET("/api/chatrooms", handlers.GetUserChatRooms)
 
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")

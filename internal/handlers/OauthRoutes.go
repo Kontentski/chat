@@ -75,7 +75,7 @@ func CallbackHandler(c *gin.Context) {
 
 func LogoutHandler(c *gin.Context) {
 	session, _ := auth.Store.Get(c.Request, "auth-session")
-	session.Values["user"] = nil
+	session.Options.MaxAge = -1 
 	session.Save(c.Request, c.Writer)
 	c.Redirect(http.StatusFound, "/homepage")
 }

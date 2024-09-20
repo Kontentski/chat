@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/kontentski/chat/internal/auth"
+	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/models"
 	"github.com/kontentski/chat/internal/storage"
 )
@@ -37,6 +38,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to upgrade to WebSocket: %v", err)
 		return
 	}
+
 	defer conn.Close()
 
 	session, err := auth.Store.Get(r, "auth-session")
@@ -50,6 +52,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Println("No userID in session")
 		return
 	}
+	defer storage.UpdateLastSeen(userID)
 
 	Username, ok := session.Values["username"].(string)
 	if !ok {
@@ -58,7 +61,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var name string
-	err = storage.DB.QueryRow(context.Background(), "SELECT name FROM users WHERE id = $1", userID).Scan(&name)
+	err = database.DB.QueryRow(context.Background(), "SELECT name FROM users WHERE id = $1", userID).Scan(&name)
 	if err != nil {
 		log.Printf("Failed to find user with ID %d: %v", userID, err)
 		return
@@ -80,8 +83,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error sending user info: %v", err)
 		return
 	}
+	messageStorage := &storage.UserQuery{DB: database.DB}
 
-	go readMessages(conn)
+	go readMessages(conn, messageStorage)
 	handleMessages()
 	handleConnection(conn)
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/models"
 	"github.com/kontentski/chat/internal/storage"
 )
@@ -31,10 +32,11 @@ func handleConnection(conn *websocket.Conn) {
 	}()
 }
 
-func readMessages(conn *websocket.Conn) {
+func readMessages(conn *websocket.Conn, messageStorage storage.UserStorage) {
 	defer func() {
 		conn.Close()          // Ensure connection is closed properly
 		delete(clients, conn) // Clean up the clients map
+		storage.UpdateLastSeen(clients[conn].userID)
 	}()
 
 	for {
@@ -73,11 +75,9 @@ func readMessages(conn *websocket.Conn) {
 			continue
 		}
 
-		// Log the parsed message
 		log.Printf("Received message")
 
-		// Ensure user is a member of the chat room
-		if !isUserInChatRoom(clientData.userID, msg.ChatRoomID) {
+		if !messageStorage.IsUserInChatRoom(clientData.userID, msg.ChatRoomID) {
 			log.Printf("User %d is not a member of chat room %d", clientData.userID, msg.ChatRoomID)
 			continue
 		}
@@ -106,7 +106,7 @@ func markMessageAsRead(userID uint, messageID uint, chatRoomID uint) error {
         END
     `
 
-	_, err := storage.DB.Exec(context.Background(), query, userID, messageID, chatRoomID)
+	_, err := database.DB.Exec(context.Background(), query, userID, messageID, chatRoomID)
 	return err
 }
 
@@ -116,22 +116,6 @@ func mapToStruct(data map[string]interface{}, target interface{}) error {
 		return err
 	}
 	return json.Unmarshal(encoded, target)
-}
-
-func isUserInChatRoom(userID uint, chatRoomID uint) bool {
-	log.Println("query chat room")
-	query := `
-	SELECT COUNT(*) 
-	FROM chat_room_members 
-	WHERE user_id = $1 AND chat_room_id = $2
-	`
-	var count int
-	err := storage.DB.QueryRow(context.Background(), query, userID, chatRoomID).Scan(&count)
-	if err != nil {
-		log.Printf("Error checking user access: %v", err)
-		return false
-	}
-	return count > 0
 }
 
 func handleMessages() {
@@ -168,7 +152,7 @@ func handleMessages() {
 
 			// Handle regular messages ( i think the next 8 rows not needed here)
 			var sender models.Users
-			err := storage.DB.QueryRow(context.Background(), "SELECT id, username, name FROM users WHERE id = $1", msg.SenderID).Scan(&sender.ID, &sender.Username, &sender.Name)
+			err := database.DB.QueryRow(context.Background(), "SELECT id, username, name FROM users WHERE id = $1", msg.SenderID).Scan(&sender.ID, &sender.Username, &sender.Name)
 			if err != nil {
 				log.Printf("Error fetching sender details: %v", err)
 				continue
@@ -215,9 +199,8 @@ func getChatRoomIDs(chatRooms []models.ChatRooms) []uint {
 
 // saveMessageToDB saves a message to the database with an incremented message ID unique to the chat room.
 func saveMessageToDB(msg *models.Messages) error {
-	// Begin a transaction to ensure atomic operation
 	log.Println("Starting transaction to save message")
-	tx, err := storage.DB.Begin(context.Background())
+	tx, err := database.DB.Begin(context.Background())
 	if err != nil {
 		log.Printf("Error starting transaction: %v", err)
 		return err
@@ -233,7 +216,6 @@ func saveMessageToDB(msg *models.Messages) error {
 	}()
 
 	// Retrieve the highest message ID for the chat room
-	log.Printf("Retrieving the highest message ID for chat room %d", msg.ChatRoomID)
 	var lastMessageID uint
 	query := `
 		SELECT COALESCE(MAX(message_id), 0)
@@ -258,9 +240,5 @@ func saveMessageToDB(msg *models.Messages) error {
 		log.Printf("Error inserting message into DB: %v", err)
 		return err
 	}
-	log.Printf("Message inserted successfully with timestamp: %v", msg.Timestamp)
-
-	// Commit the transaction
-	log.Println("Transaction committed successfully")
 	return nil
 }

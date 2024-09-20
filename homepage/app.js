@@ -8,6 +8,48 @@ const notificationSound = new Audio('assets/notification.mp3');
 const chatRoomList = document.getElementById('chat-room-list-items');
 const chatBox = document.getElementById('chat-box');
 
+document.addEventListener('DOMContentLoaded', function() {
+    const loginButton = document.getElementById('google-login');
+    const logoutButton = document.getElementById('logout-button');
+    const userInfo = document.getElementById('user-info');
+    
+    // Utility function to get cookie value
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    function checkLoginStatus() {
+        const authSession = getCookie('auth-session');
+
+        if (authSession) {
+            loginButton.style.display = 'none'; 
+            logoutButton.style.display = 'block'; 
+            userInfo.style.display = 'block';
+        } else {
+            loginButton.style.display = 'block'; 
+            logoutButton.style.display = 'none';
+            userInfo.style.display = 'none';
+        }
+    }
+
+    checkLoginStatus();
+
+    logoutButton.addEventListener('click', function() {
+        fetch('/auth/logout', { method: 'POST' }) // Send POST request to your logout route
+            .then(response => {
+                if (response.ok) {
+                    document.cookie = 'auth-session=; Max-Age=0; path=/'; // Clear auth-session cookie
+                    window.location.reload(); // Refresh the page to show login state
+                } else {
+                    alert('Logout failed');
+                }
+            });
+    });
+});
+
+
 // Google login button
 document.getElementById('google-login').addEventListener('click', function() {
     window.location.href = 'https://champion-thoroughly-walrus.ngrok-free.app/auth?provider=google';
