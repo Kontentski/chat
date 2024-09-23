@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register</title>
+  </head>
+  <body>
+    <form id="register-form">
+      <label for="username">Username:</label>
+      <input type="text" id="username" name="username" required />
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password" required />
+      <!-- Add a checkbox to show/hide password -->
+      <input type="checkbox" id="show-password" /> 
+      <button type="submit">Register</button>
+
+      <div id="error-message" style="color: red"></div>
+    </form>
+
+    <!-- Correct path to JS file -->
+    <script src="/homepage/register/register.js"></script>
+  </body>
+</html>

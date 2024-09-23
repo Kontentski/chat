@@ -1,5 +1,5 @@
 package handlers
-
+/* 
 import (
 	"errors"
 	"net/http"
@@ -64,3 +64,4 @@ func GetChatRoomsHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, chatRooms)
 }
+ */

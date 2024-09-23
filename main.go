@@ -5,35 +5,53 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/kontentski/chat/internal/auth"
+	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/handlers"
+	"github.com/kontentski/chat/internal/middleware"
+	"github.com/kontentski/chat/internal/services"
 	"github.com/kontentski/chat/internal/storage"
 )
 
 func main() {
-	storage.Init()
-	storage.RunMigrations()
+	database.Init()
+	database.RunMigrations()
+	userStorage := &storage.UserQuery{
+		DB: database.DB,
+	}
+
+	authStorage := &storage.RealAuth{}
+	userService := services.UserChatRoomService{
+		UserRepo: userStorage,
+		AuthRepo: authStorage,
+	}
+	auth.Init()
 
 	r := gin.Default()
 
-	// Serve static files from the "static" folder at the "/static" route
-
-	r.Static("/static", "./static")
+	r.Static("/homepage", "./homepage")
 
 	// WebSocket endpoint
 	r.GET("/ws", func(c *gin.Context) {
-		handlers.HandleWebSocket(c.Writer, c.Request)
+		handlers.HandleWebSocket(c.Writer, c.Request, &userService)
 	})
-	r.POST("/users", handlers.CreateUser)
 
-    // Message endpoints
-    r.POST("/messages", handlers.SendMessage)
-	r.GET("/messages/:chatRoomID", handlers.GetMessages)
-	r.DELETE("/messages/:messageID", handlers.DeleteMessage)
+	// Authentication routes
+	r.GET("/auth", handlers.AuthHandler)
+	r.GET("/auth/callback", handlers.CallbackHandler)
+	r.GET("/auth/register/", handlers.RegisterHandler)
+	r.POST("/auth/register", handlers.RegisterPostHandler)
+	r.POST("/auth/logout", handlers.LogoutHandler)
 
+	r.Use(middleware.AuthMiddleware(auth.Store))
+	r.POST("/users", handlers.CreateUser(userStorage))
 
+	// Message endpoints
+	r.GET("/messages/:chatRoomID", handlers.GetMessagesHandler(userService))
+	r.DELETE("/messages/:messageID", handlers.DeleteMessageHandler(&userService))
 
-    // Chat room endpoints
-    r.GET("/api/chatrooms", handlers.GetChatRoomsHandler)
+	// Chat room endpoints
+	r.GET("/api/chatrooms", handlers.GetUserChatRoomsHandler(userService))
 
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")

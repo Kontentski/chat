@@ -1,17 +1,71 @@
-let userID;
+let username;
 let socket;
 let currentChatRoomID = null;
 let pingInterval = 60000; // 60 seconds
 let titleInterval = null;
 
 const notificationSound = new Audio('assets/notification.mp3');
-const username = prompt('Enter your username:');
 const chatRoomList = document.getElementById('chat-room-list-items');
 const chatBox = document.getElementById('chat-box');
 
-// Connect to WebSocket server
+document.addEventListener('DOMContentLoaded', function() {
+    const loginButton = document.getElementById('google-login');
+    const logoutButton = document.getElementById('logout-button');
+    const userInfo = document.getElementById('user-info');
+    
+    // Utility function to get cookie value
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    function checkLoginStatus() {
+        const authSession = getCookie('auth-session');
+
+        if (authSession) {
+            loginButton.style.display = 'none'; 
+            logoutButton.style.display = 'block'; 
+            userInfo.style.display = 'block';
+        } else {
+            loginButton.style.display = 'block'; 
+            logoutButton.style.display = 'none';
+            userInfo.style.display = 'none';
+        }
+    }
+
+    checkLoginStatus();
+
+    logoutButton.addEventListener('click', function() {
+        fetch('/auth/logout', { method: 'POST' }) // Send POST request to your logout route
+            .then(response => {
+                if (response.ok) {
+                    document.cookie = 'auth-session=; Max-Age=0; path=/'; // Clear auth-session cookie
+                    window.location.reload(); // Refresh the page to show login state
+                } else {
+                    alert('Logout failed');
+                }
+            });
+    });
+});
+
+
+// Google login button
+document.getElementById('google-login').addEventListener('click', function() {
+    window.location.href = 'https://champion-thoroughly-walrus.ngrok-free.app/auth?provider=google';
+});
+
+// Utility function to get cookie value
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+// Connect to WebSocket server with username
 function connectWebSocket() {
-    socket = new WebSocket(`wss://electric-wasp-cool.ngrok-free.app/ws?username=${username}`);
+    const wsUrl = `wss://champion-thoroughly-walrus.ngrok-free.app/ws`;
+    socket = new WebSocket(wsUrl);
 
     socket.onopen = function() {
         console.log('Connected to WebSocket server');
@@ -19,16 +73,14 @@ function connectWebSocket() {
 
     socket.onmessage = function(event) {
         const data = JSON.parse(event.data);
-        console.log('Received data:', data);  // Log the received data
+        console.log('Received data:', data);
 
-        if (data.token) {
-            handleToken(data.token);
-        } else if (data.userID) {
+        if (data.userID) {
             handleUserID(data);
         } else if (Array.isArray(data)) {
             handleChatRooms(data);
         } else if (data.type === "delete") {
-            handleDeleteMessage(data);
+            handleDeleteMessage(data.message_id, data.chat_room_id);
         } else if (data.chat_room_id === currentChatRoomID) {
             handleIncomingMessage(data);
         } else {
@@ -47,14 +99,10 @@ function connectWebSocket() {
     };
 }
 
-// message deletion
-function handleDeleteMessage(data) {
-    removeMessageFromUI(data.message_id, data.chat_room_id); 
-}
+connectWebSocket();
 
-//remove a message from the UI
-function removeMessageFromUI(messageID, chatRoomID) {
-    // Select the chat room list item that matches the chatRoomID
+// message deletion
+function handleDeleteMessage(messageID, chatRoomID) {
     const chatRoomListItem = document.querySelector(`li[data-chat-room-id="${chatRoomID}"]`);
 
     if (chatRoomListItem) {
@@ -72,10 +120,7 @@ function removeMessageFromUI(messageID, chatRoomID) {
         }
     } else {
         console.error('Chat room not found for ID:', chatRoomID);
-    }
-}
-
-
+    }}
 
 function reconnectWebSocket() {
     console.log('Attempting to reconnect WebSocket...');
@@ -84,19 +129,10 @@ function reconnectWebSocket() {
     }, 5000); // Retry after 5 seconds
 }
 
-connectWebSocket();
-
-// Handle token reception
-function handleToken(token) {
-    localStorage.setItem('token', token);
-    console.log('Token received and stored');
-}
-
 // Handle user ID reception
 function handleUserID(data) {
     userID = data.userID;
-    localStorage.setItem('userID', userID);
-    document.getElementById('user-username').textContent = `Username: ${username}`;
+    document.getElementById('user-username').textContent = `Username: ${data.username}`;
     document.getElementById('user-name').textContent = `Name: ${data.name}`;
     fetchChatRooms();
 }
@@ -173,12 +209,9 @@ function playNotificationSound() {
 
 // Fetch chat rooms from server
 function fetchChatRooms() {
-    const token = localStorage.getItem('token');
     fetch('/api/chatrooms', {
         method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include' // Ensure cookies are sent with the request
     })
     .then(response => response.json())
     .then(handleChatRooms)
@@ -193,20 +226,13 @@ function selectChatRoom(chatRoomID) {
 
 // Fetch message history for a chat room
 function fetchMessageHistory(chatRoomID) {
-    const token = localStorage.getItem('token');
     fetch(`/messages/${chatRoomID}?userID=${userID}`, {
         method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include' // Ensure cookies are sent with the request
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Network response was not ok ${response.statusText}`);
-        }
-        return response.json();
-    })
+    .then(response => response.json())
     .then(messages => {
+        console.log('Fetched messages:');
         if (Array.isArray(messages)) {
             chatBox.innerHTML = '';
             messages.forEach(appendMessageToChatBox);
@@ -219,17 +245,11 @@ function fetchMessageHistory(chatRoomID) {
     .catch(error => console.error('Error fetching message history:', error));
 }
 
+// Handle message deletion
 function deleteMessage(messageID, chatRoomID) {
-    const token = localStorage.getItem('token');
-    const userID = localStorage.getItem('userID'); // Retrieve userID from local storage
-
     fetch(`/messages/${messageID}?chat_room_id=${chatRoomID}&user_id=${userID}`, {
         method: 'DELETE',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-        // No body is needed if all parameters are in the URL
+        credentials: 'include' // Ensure cookies are sent with the request
     })
     .then(response => {
         if (!response.ok) {
@@ -281,32 +301,43 @@ function sendReadReceipt(messageID) {
 }
 
 
-
+// Check if an element is in the viewport
 function isElementInViewport(el) {
-    const rect = el.getBoundingClientRect();
-    return (
-        rect.top >= 0 &&
-        rect.left >= 0 &&
-        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    const chatBoxRect = chatBox.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+
+    // Check if the element is within the chat box bounds
+    const isInChatBox = (
+        elRect.top < chatBoxRect.bottom &&
+        elRect.bottom > chatBoxRect.top
     );
+    return isInChatBox;
 }
 
+// Check for read receipts
 function checkReadReceipts() {
-    const messageElements = Array.from(chatBox.children);
-    messageElements.forEach(messageElement => {
-        if (isElementInViewport(messageElement)) {
-            const messageID = messageElement.dataset.messageId;
-            const readAt = messageElement.dataset.readAt;
-            if (messageID && (readAt === '1970-01-01T00:00:00Z' || readAt === null)) {
-                sendReadReceipt(messageID);
-            }
+    const messageElements = Array.from(chatBox.getElementsByClassName('message'));
+
+    messageElements.forEach(messageEl => {
+        if (isElementInViewport(messageEl)) {
+            const messageID = messageEl.dataset.messageId;
+            sendReadReceipt(messageID);
         }
     });
 }
 
+// Set up a periodic check for read receipts
+setInterval(checkReadReceipts, 5000);
 
-// Call sendReadReceipt() when a message is read
+// Adjust scroll position based on read status
+function adjustScrollPosition(messages) {
+    // Scroll to the bottom if no messages are present or if scroll position is at the bottom
+    if (messages.length === 0 || chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight) {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+}
+
+// Append a message to the chat box
 function appendMessageToChatBox(message) {
     const messageElement = document.createElement('div');
     messageElement.textContent = `${message.sender.name}: ${message.content}`;
@@ -346,7 +377,7 @@ chatBox.addEventListener('scroll', function() {
     checkReadReceipts();
 });
 
-// Adjust scroll position based on read and unread messages
+
 function adjustScrollPosition(messages) {
     // Find the index of the last read message
     const lastReadMessageIndex = messages.slice().reverse().findIndex(msg => msg.read_at !== '1970-01-01T00:00:00Z');
