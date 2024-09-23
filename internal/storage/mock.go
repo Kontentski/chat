@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/kontentski/chat/internal/models"
@@ -36,13 +37,21 @@ func (m *MockUser) DeleteMessage(ctx context.Context, messageID, chatRoomID uint
 }
 
 func (m *MockUser) GetMessages(ctx context.Context, userID string, chatRoomID string) ([]models.Messages, error) {
-	args := m.Called(userID, chatRoomID)
+	args := m.Called(ctx, userID, chatRoomID)
 	return args.Get(0).([]models.Messages), args.Error(1)
 }
 
 func (m *MockUser) GetSession(req *http.Request) (map[string]interface{}, error) {
 	args := m.Called(req)
 	return args.Get(0).(map[string]interface{}), args.Error(1)
+}
+
+func (m *MockUser) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
+	args := m.Called(userID)
+	if chatRooms, ok := args.Get(0).([]models.ChatRooms); ok {
+		return chatRooms, args.Error(1)
+	}
+	return nil, fmt.Errorf("database error")
 }
 
 type MockTransaction struct {

@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kontentski/chat/internal/models"
+	"github.com/kontentski/chat/internal/services"
 	"github.com/kontentski/chat/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -74,9 +76,11 @@ func TestDeleteMessage_Success(t *testing.T) {
 			return nil // Simulate successful deletion
 		},
 	}
+	mockAuth := new(storage.MockUser)
+	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
 
 	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessage(mockStorage))
+	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
 
 	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2&user_id=3", nil)
 	w := httptest.NewRecorder()
@@ -88,10 +92,12 @@ func TestDeleteMessage_Success(t *testing.T) {
 }
 
 func TestDeleteMessage_MissingParams(t *testing.T) {
-	mockStorage := &storage.MockUser{}
+	mockStorage := new(storage.MockUser)
+	mockAuth := new(storage.MockUser)
+	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
 
 	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessage(mockStorage))
+	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
 	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=&user_id=", nil)
 	w := httptest.NewRecorder()
 
@@ -107,9 +113,11 @@ func TestDeleteMessage_Unauthorized(t *testing.T) {
 			return false // Simulate user is not authorized
 		},
 	}
+	mockAuth := new(storage.MockUser)
+	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
 
 	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessage(mockStorage))
+	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
 	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2&user_id=3", nil)
 	w := httptest.NewRecorder()
 
@@ -128,57 +136,213 @@ func TestDeleteMessage_Failure(t *testing.T) {
 			return errors.New("deletion failed") // Simulate failure
 		},
 	}
+	mockAuth := new(storage.MockUser)
+	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
 
 	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessage(mockStorage))
+	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
 	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2&user_id=3", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.JSONEq(t, `{"error": "Failed to delete message"}`, w.Body.String())
+	assert.JSONEq(t, `{"error":"failed to delete message: deletion failed"}`, w.Body.String())
 }
 
 func TestGetMessages(t *testing.T) {
-    // Create a new Gin engine and route for testing
-    r := gin.Default()
-    mockStorage := new(storage.MockUser)
+	// Initialize the mock objects
+	mockAuth := new(storage.MockUser)
+	mockRepo := new(storage.MockUser)
+	service := &services.UserChatRoomService{
+		UserRepo: mockRepo,
+		AuthRepo: mockAuth,
+	}
 
-    // Define the mock behavior
-    mockStorage.On("GetSession", mock.Anything).Return(map[string]interface{}{"userID": "user1"}, nil)
-    mockStorage.On("GetMessages", "user1", "chatroom1").Return([]models.Messages{
-        {
-            MessageID:  1,
-            SenderID:   1,
-            Sender:     models.Users{Username: "testuser", Name: "Test User"},
-            Content:    "Hello, World!",
-            ChatRoomID: 1,
-            IsDM:       false,
-            ReadAt:     "1970-01-01T00:00:00Z",
-        },
-    }, nil)
+	// Create a test context
+	gin.SetMode(gin.TestMode)
 
-    // Use the GetMessages function with the mock
-    r.GET("/messages/:chatRoomID", GetMessages(mockStorage, mockStorage))
+	t.Run("Success - Valid Session and Messages Fetched", func(t *testing.T) {
+		// Arrange
+		chatRoomID := "1"
+		userID := "123"
+		sessionValues := map[string]interface{}{
+			"userID": 123,
+		}
+		messages := []models.Messages{
+			{MessageID: 1, SenderID: 1, Content: "Hello", Timestamp: time.Now(), ChatRoomID: 1, IsDM: true},
+		}
 
-    // Create a request to test the route
-    req, err := http.NewRequest(http.MethodGet, "/messages/chatroom1?userID=user1", nil)
-    if err != nil {
-        t.Fatalf("Could not create request: %v", err)
-    }
+		// Mock dependencies
+		mockAuth.On("GetSession", mock.Anything).Return(sessionValues, nil)
+		mockRepo.On("GetMessages", mock.Anything, userID, chatRoomID).Return(messages, nil)
 
-    // Record the response
-    w := httptest.NewRecorder()
-    r.ServeHTTP(w, req)
+		// Create the test request and response recorder
+		c, _ := createTestContextWithParams("chatRoomID", chatRoomID, "userID", userID)
 
-    // Assert the status code
-    assert.Equal(t, http.StatusOK, w.Code)
+		// Act
+		actualMessages, err := service.GetMessages(c)
 
-    // Assert the response body
-    expectedResponse := `[{"chat_room_id":1, "content":"Hello, World!", "is_dm":false, "message_id":1, "read_at":"1970-01-01T00:00:00Z", "sender":{"created_at":"0001-01-01T00:00:00Z", "email":"", "id":0, "last_seen":"0001-01-01T00:00:00Z", "name":"Test User", "password":"", "profile_picture":"", "username":"testuser"}, "sender_id":1, "timestamp":"0001-01-01T00:00:00Z", "type":""}]`
-    assert.JSONEq(t, expectedResponse, w.Body.String())
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, messages, actualMessages)
+		mockAuth.AssertExpectations(t)
+		mockRepo.AssertExpectations(t)
 
-    // Assert that the expected methods were called
-    mockStorage.AssertExpectations(t)
+		// Reset the mock after test run
+		mockAuth = new(storage.MockUser)
+		service.AuthRepo = mockAuth
+	})
+
+	t.Run("Unauthorized - UserID mismatch in session", func(t *testing.T) {
+		// Arrange
+		chatRoomID := "1"
+		userID := "1232"
+		sessionValues2 := map[string]interface{}{
+			"userID": 999, // Different userID in session
+		}
+
+		// Mock dependencies
+		mockAuth.On("GetSession", mock.Anything).Return(sessionValues2, nil)
+
+		// Create the test request and response recorder
+		c, _ := createTestContextWithParams("chatRoomID", chatRoomID, "userID", userID)
+
+		// Act
+		_, err := service.GetMessages(c)
+
+		// Assert
+		if err == nil {
+			t.Error("An error is expected but got nil")
+		} else {
+			assert.Equal(t, "unauthorized", err.Error()) // Assuming this is the error message returned
+		}
+		mockAuth.AssertExpectations(t)
+		mockRepo.AssertNotCalled(t, "GetMessages")
+	})
+}
+
+// Helper function to create a test context
+func createTestContextWithParams(paramKey, paramValue, queryKey, queryValue string) (*gin.Context, *httptest.ResponseRecorder) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.URL.RawQuery = queryKey + "=" + queryValue
+	c.Request = req
+	c.Params = gin.Params{
+		{Key: paramKey, Value: paramValue},
+	}
+
+	return c, w
+}
+
+
+func TestFetchUserChatRooms(t *testing.T) {
+    // Create a test context
+    gin.SetMode(gin.TestMode)
+
+    t.Run("Success - Valid Session and Chat Rooms Fetched", func(t *testing.T) {
+        // Initialize the mock objects
+        mockAuth := new(storage.MockUser)
+        mockRepo := new(storage.MockUser)
+        service := &services.UserChatRoomService{
+            UserRepo: mockRepo,
+            AuthRepo: mockAuth,
+        }
+
+        // Arrange
+        userID := uint(123)
+        sessionValues := map[string]interface{}{
+            "userID": userID,
+        }
+        chatRooms := []models.ChatRooms{
+            {ID: 1, Name: "General", Description: "General Chat", Type: "public"},
+            {ID: 2, Name: "Tech Talk", Description: "Technology discussion", Type: "private"},
+        }
+
+        // Mock dependencies
+        mockAuth.On("GetSession", mock.Anything).Return(sessionValues, nil)
+        mockRepo.On("FetchUserChatRooms", userID).Return(chatRooms, nil)
+
+        // Create the test request
+        req, _ := http.NewRequest(http.MethodGet, "/", nil)
+
+        // Act
+        actualChatRooms, err := service.FetchUserChatRooms(req)
+
+        // Assert
+        assert.NoError(t, err)
+        assert.Equal(t, chatRooms, actualChatRooms)
+        mockAuth.AssertExpectations(t)
+        mockRepo.AssertExpectations(t)
+    })
+
+    t.Run("Error - Invalid Session (userID not found)", func(t *testing.T) {
+        // Initialize the mock objects
+        mockAuth := new(storage.MockUser)
+        mockRepo := new(storage.MockUser)
+        service := &services.UserChatRoomService{
+            UserRepo: mockRepo,
+            AuthRepo: mockAuth,
+        }
+
+        // Arrange
+        sessionValues := map[string]interface{}{
+            // Missing userID or incorrect type
+        }
+
+        // Mock dependencies
+        mockAuth.On("GetSession", mock.Anything).Return(sessionValues, nil)
+
+        // Create the test request
+        req, _ := http.NewRequest(http.MethodGet, "/", nil)
+
+        // Act
+        _, err := service.FetchUserChatRooms(req)
+
+        // Assert
+        if err == nil {
+            t.Error("Expected error but got nil")
+        } else {
+            assert.Contains(t, err.Error(), "unauthorized")
+        }
+        mockAuth.AssertExpectations(t)
+        mockRepo.AssertNotCalled(t, "FetchUserChatRooms")
+    })
+
+    t.Run("Error - Failed to Fetch Chat Rooms from Repo", func(t *testing.T) {
+        // Initialize the mock objects
+        mockAuth := new(storage.MockUser)
+        mockRepo := new(storage.MockUser)
+        service := &services.UserChatRoomService{
+            UserRepo: mockRepo,
+            AuthRepo: mockAuth,
+        }
+
+        // Arrange
+        userID := uint(123)
+        sessionValues := map[string]interface{}{
+            "userID": userID,
+        }
+        expectedErr := fmt.Errorf("database error")
+
+        // Mock dependencies
+        mockAuth.On("GetSession", mock.Anything).Return(sessionValues, nil)
+        mockRepo.On("FetchUserChatRooms", userID).Return(nil, expectedErr)
+
+        // Create the test request
+        req, _ := http.NewRequest(http.MethodGet, "/", nil)
+
+        // Act
+        _, err := service.FetchUserChatRooms(req)
+
+        // Assert
+        assert.Error(t, err)
+        assert.EqualError(t, err, expectedErr.Error())
+
+        // Verify expectations were met
+        mockAuth.AssertExpectations(t)
+        mockRepo.AssertExpectations(t)
+    })
 }

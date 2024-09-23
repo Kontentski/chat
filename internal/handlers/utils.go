@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/models"
+	"github.com/kontentski/chat/internal/services"
 	"github.com/kontentski/chat/internal/storage"
 )
 
@@ -18,7 +19,6 @@ func handleConnection(conn *websocket.Conn) {
 		return nil
 	})
 
-	// Handle ping/pong in a separate goroutine
 	go func() {
 		ticker := time.NewTicker(pingPeriod)
 		defer ticker.Stop()
@@ -26,7 +26,7 @@ func handleConnection(conn *websocket.Conn) {
 		for range ticker.C {
 			conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return // Exit the goroutine if there is an error
+				return
 			}
 		}
 	}()
@@ -34,9 +34,9 @@ func handleConnection(conn *websocket.Conn) {
 
 func readMessages(conn *websocket.Conn, messageStorage storage.UserStorage) {
 	defer func() {
-		conn.Close()          // Ensure connection is closed properly
-		delete(clients, conn) // Clean up the clients map
 		storage.UpdateLastSeen(clients[conn].userID)
+		conn.Close()
+		delete(clients, conn)
 	}()
 
 	for {
@@ -91,7 +91,7 @@ func readMessages(conn *websocket.Conn, messageStorage storage.UserStorage) {
 		log.Printf("Broadcasting message")
 
 		// Broadcast the message
-		broadcast <- msg
+		Broadcast <- msg
 	}
 }
 
@@ -118,14 +118,14 @@ func mapToStruct(data map[string]interface{}, target interface{}) error {
 	return json.Unmarshal(encoded, target)
 }
 
-func handleMessages() {
-	for msg := range broadcast {
+func handleMessages(service *services.UserChatRoomService) {
+	for msg := range Broadcast {
 
 		if msg.Type == "delete" {
 			log.Println("Handling delete message")
 			// Handle deletion event
 			for client, clientData := range clients {
-				accessibleChatRooms, err := FetchUserChatRooms(clientData.userID)
+				accessibleChatRooms, err := service.FetchUserChatRoomsByUserID(clientData.userID)
 				if err != nil {
 					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
 					continue
@@ -160,7 +160,7 @@ func handleMessages() {
 			msg.Sender = sender
 
 			for client, clientData := range clients {
-				accessibleChatRooms, err := FetchUserChatRooms(clientData.userID)
+				accessibleChatRooms, err := service.FetchUserChatRoomsByUserID(clientData.userID)
 				if err != nil {
 					log.Printf("Error fetching chat rooms for user %d: %v", clientData.userID, err)
 					continue

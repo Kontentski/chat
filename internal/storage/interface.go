@@ -19,6 +19,7 @@ type UserStorage interface {
 	IsUserInChatRoom(userID, chatRoomID uint) bool
 	DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error
 	GetMessages(ctx context.Context ,userID string, chatRoomID string) ([]models.Messages, error)
+	FetchUserChatRooms(userID uint) ([]models.ChatRooms, error)
 }
 
 type AuthInterface interface {
@@ -103,10 +104,6 @@ func (r *UserQuery) GetMessages(ctx context.Context, userID string, chatRoomID s
 			msg.ReadAt = "1970-01-01T00:00:00Z"
 		}
 
-		// Log each message
-		log.Printf("GetMessages: Retrieved message - ID: %d, SenderID: %d, Content: %s, Timestamp: %s, ReadAt: %s", 
-			msg.MessageID, msg.SenderID, msg.Content, msg.Timestamp.Format(time.RFC3339), msg.ReadAt)
-
 		messages = append(messages, msg)
 	}
 
@@ -120,6 +117,25 @@ func (r *UserQuery) GetMessages(ctx context.Context, userID string, chatRoomID s
 	log.Printf("GetMessages: Total messages retrieved - %d", len(messages))
 
 	return messages, nil
+}
+
+func (r *UserQuery) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
+	rows, err := r.DB.Query(context.Background(), FetchUserChatRoomsQuery, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chatRooms []models.ChatRooms
+	for rows.Next() {
+		var room models.ChatRooms
+		if err := rows.Scan(&room.ID, &room.Name, &room.Description, &room.Type); err != nil {
+			return nil, err
+		}
+		chatRooms = append(chatRooms, room)
+	}
+
+	return chatRooms, nil
 }
 
 type RealAuth struct {

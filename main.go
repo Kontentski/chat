@@ -9,6 +9,7 @@ import (
 	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/handlers"
 	"github.com/kontentski/chat/internal/middleware"
+	"github.com/kontentski/chat/internal/services"
 	"github.com/kontentski/chat/internal/storage"
 )
 
@@ -18,7 +19,12 @@ func main() {
 	userStorage := &storage.UserQuery{
 		DB: database.DB,
 	}
+
 	authStorage := &storage.RealAuth{}
+	userService := services.UserChatRoomService{
+		UserRepo: userStorage,
+		AuthRepo: authStorage,
+	}
 	auth.Init()
 
 	r := gin.Default()
@@ -27,7 +33,7 @@ func main() {
 
 	// WebSocket endpoint
 	r.GET("/ws", func(c *gin.Context) {
-		handlers.HandleWebSocket(c.Writer, c.Request)
+		handlers.HandleWebSocket(c.Writer, c.Request, &userService)
 	})
 
 	// Authentication routes
@@ -41,11 +47,11 @@ func main() {
 	r.POST("/users", handlers.CreateUser(userStorage))
 
 	// Message endpoints
-	r.GET("/messages/:chatRoomID", handlers.GetMessages(userStorage, authStorage))
-	r.DELETE("/messages/:messageID", handlers.DeleteMessage(userStorage))
+	r.GET("/messages/:chatRoomID", handlers.GetMessagesHandler(userService))
+	r.DELETE("/messages/:messageID", handlers.DeleteMessageHandler(&userService))
 
 	// Chat room endpoints
-	r.GET("/api/chatrooms", handlers.GetUserChatRooms)
+	r.GET("/api/chatrooms", handlers.GetUserChatRoomsHandler(userService))
 
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")

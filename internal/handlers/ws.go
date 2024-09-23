@@ -10,6 +10,7 @@ import (
 	"github.com/kontentski/chat/internal/auth"
 	"github.com/kontentski/chat/internal/database"
 	"github.com/kontentski/chat/internal/models"
+	"github.com/kontentski/chat/internal/services"
 	"github.com/kontentski/chat/internal/storage"
 )
 
@@ -25,14 +26,14 @@ var (
 		userID uint
 		name   string
 	})
-	broadcast  = make(chan models.Messages, 100) // Broadcast channel
+	Broadcast  = make(chan models.Messages, 100) // Broadcast channel
 	pongWait   = 60 * time.Second
 	pingPeriod = (pongWait * 9) / 10
 	writeWait  = 10 * time.Second
 )
 
 // HandleWebSocket handles WebSocket requests
-func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+func HandleWebSocket(w http.ResponseWriter, r *http.Request, service *services.UserChatRoomService) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade to WebSocket: %v", err)
@@ -40,6 +41,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer conn.Close()
+
+	go handleConnection(conn)
+
 
 	session, err := auth.Store.Get(r, "auth-session")
 	if err != nil {
@@ -86,6 +90,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	messageStorage := &storage.UserQuery{DB: database.DB}
 
 	go readMessages(conn, messageStorage)
-	handleMessages()
-	handleConnection(conn)
+	handleMessages(service)
+
 }
