@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"log"
 	"net/http"
 
@@ -46,26 +45,19 @@ func GetMessagesHandler(service services.UserChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		messages, err := service.GetMessages(c)
 		if err != nil {
-			if err == errors.New("unauthorized") {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-
 		c.JSON(http.StatusOK, messages)
 	}
 }
 
 func DeleteMessageHandler(service *services.UserChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response,err := service.DeleteMessage(c)
+		response, err := service.DeleteMessage(c)
 		if err != nil {
 			if err.Error() == "missing required parameters" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required parameters"})
-			} else if err.Error() == "user not authorized" {
-				c.JSON(http.StatusForbidden, gin.H{"error": "User not authorized to delete message"})
 			} else {
 				log.Println(err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -82,6 +74,17 @@ func DeleteMessageHandler(service *services.UserChatRoomService) gin.HandlerFunc
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
+	}
+}
+
+func LeaveTheChatRoomHandler(service *services.UserChatRoomService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := service.LeaveChatRoom(c)
+	    if err!= nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+		c.JSON(http.StatusOK, gin.H{"message": "User left the chat room successfully"})
 	}
 }
 

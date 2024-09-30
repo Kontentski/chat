@@ -3,7 +3,6 @@ package services
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -21,6 +20,8 @@ type DeleteMessageResponse struct {
 	ChatRoomID uint
 	SenderID   uint
 }
+
+const UserIDKey = "userID"
 
 // FetchUserChatRooms retrieves the user's chat rooms by processing the session.
 func (s *UserChatRoomService) FetchUserChatRooms(req *http.Request) ([]models.ChatRooms, error) {
@@ -47,32 +48,34 @@ func (s *UserChatRoomService) FetchUserChatRoomsByUserID(userID uint) ([]models.
 
 func (s *UserChatRoomService) GetMessages(c *gin.Context) ([]models.Messages, error) {
 	chatRoomID := c.Param("chatRoomID")
-	userID := c.Query("userID")
-
-	// Get session values
-	sessionValues, err := s.AuthRepo.GetSession(c.Request)
+	userID, ok := c.Get(UserIDKey)
+	if !ok {
+		return []models.Messages{}, nil
+	}
+	strchatroomID, err := strconv.Atoi(chatRoomID)
 	if err != nil {
-		return nil, fmt.Errorf("session error: %w", err)
+		return nil, fmt.Errorf("invalid chatRoomID")
 	}
-fmt.Printf("session %v",sessionValues)
-	// Validate user ID
-	sessionUserID := fmt.Sprintf("%d", sessionValues["userID"])
-	if sessionUserID != userID {
-		log.Printf("Unauthorized access - session userID: %s does not match userID: %s", sessionUserID, userID)
-		return nil, errors.New("unauthorized")
+	IntuserID := userID.(uint)
+	// Ensure user has permission to delete the message
+	if !s.UserRepo.IsUserInChatRoom(IntuserID, uint(strchatroomID)) {
+		return nil, errors.New("user not authorized")
 	}
 
-	// Fetch messages from the repository
-	return s.UserRepo.GetMessages(c.Request.Context(), userID, chatRoomID)
+
+	return s.UserRepo.GetMessages(c.Request.Context(), IntuserID, chatRoomID)
 }
 
 func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageResponse, error) {
 	messageIDStr := c.Param("messageID")
 	chatRoomIDStr := c.Query("chat_room_id")
-	userIDStr := c.Query("user_id")
+	userID, ok := c.Get(UserIDKey)
+	if !ok {
+		return nil, nil
+	}
 
 	// Validate the request parameters
-	if messageIDStr == "" || chatRoomIDStr == "" || userIDStr == "" {
+	if messageIDStr == "" || chatRoomIDStr == "" || userID == "" {
 		return nil, fmt.Errorf("missing required parameters")
 	}
 
@@ -85,12 +88,9 @@ func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageRespo
 	if err != nil {
 		return nil, fmt.Errorf("invalid chatRoomID")
 	}
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid userID")
-	}
+	IntuserID := userID.(uint)
 	// Ensure user has permission to delete the message
-	if !s.UserRepo.IsUserInChatRoom(uint(userID), uint(chatRoomID)) {
+	if !s.UserRepo.IsUserInChatRoom(IntuserID, uint(chatRoomID)) {
 		return nil, errors.New("user not authorized")
 	}
 
@@ -101,6 +101,29 @@ func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageRespo
 	return &DeleteMessageResponse{
 		MessageID:  uint(messageID),
 		ChatRoomID: uint(chatRoomID),
-		SenderID:   uint(userID),
+		SenderID:   IntuserID,
 	}, nil
+}
+
+func (s *UserChatRoomService) LeaveChatRoom(c *gin.Context) error {
+	chatRoomIDStr := c.Param("chatRoomID")
+	userID, ok := c.Get(UserIDKey)
+	if !ok {
+		return fmt.Errorf("no userID")
+	}
+	fmt.Printf("chatroooooooooooon %s\n\n\n", chatRoomIDStr)
+	IntuserID := userID.(uint)
+	chatRoomID, err := strconv.Atoi(chatRoomIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid chatRoomID")
+	}
+	if !s.UserRepo.IsUserInChatRoom(IntuserID, uint(chatRoomID)) {
+		return errors.New("user is not part of the chat room")
+	}
+
+	err = s.UserRepo.DeleteUserFromChatRoom(c, IntuserID, uint(chatRoomID))
+	if err != nil {
+		return errors.New("failed to leave the chat room")
+	}
+	return nil
 }

@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const logoutButton = document.getElementById('logout-button');
     const userInfo = document.getElementById('user-info');
     
+    console.log('dom loaded')
     // Utility function to get cookie value
     function getCookie(name) {
         const value = `; ${document.cookie}`;
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             loginButton.style.display = 'block'; 
             logoutButton.style.display = 'none';
-            userInfo.style.display = 'none';
+            userInfo.style.display = 'block';
         }
     }
 
@@ -140,13 +141,97 @@ function handleUserID(data) {
 // Handle chat rooms data
 function handleChatRooms(chatRooms) {
     chatRoomList.innerHTML = '';
+
+    // Track the current selected chat room
+    let currentChatRoomId = null;
+
     chatRooms.forEach(room => {
         const listItem = document.createElement('li');
-        listItem.textContent = room.name;
         listItem.dataset.chatRoomId = room.id;
-        listItem.addEventListener('click', () => selectChatRoom(room.id));
-        chatRoomList.appendChild(listItem);
+        listItem.style.position = 'relative'; // Enable positioning for dropdown
+
+        // Create a clickable element for the chat room name
+        const chatRoomName = document.createElement('span');
+        chatRoomName.textContent = room.name;
+        chatRoomName.classList.add('chat-room-name');
+        chatRoomName.style.cursor = 'pointer'; // Change cursor to pointer for clickable effect
+
+        // Create settings button (three dots), hidden initially
+        const settingsButton = document.createElement('button');
+        settingsButton.textContent = '⋮'; // Three dots icon
+        settingsButton.classList.add('settings-button');
+        settingsButton.style.display = 'none'; // Hidden by default
+        settingsButton.style.marginLeft = '10px';
+
+        // Create dropdown container
+        const dropdown = document.createElement('div');
+        dropdown.classList.add('dropdown-content');
+        dropdown.style.display = 'none'; // Initially hidden
+
+        // Add Members to Group option
+        const addMembers = document.createElement('button');
+        addMembers.textContent = 'Add Members to Group';
+        addMembers.addEventListener('click', () => addMembersToGroup(room.id));
+
+        // Leave Group option
+        // Leave Group option
+        const leaveGroup = document.createElement('button');
+        leaveGroup.textContent = 'Leave Group';
+        leaveGroup.dataset.chatRoomId = room.id; // Ensure ID is set
+        leaveGroup.dataset.chatRoomName = room.name; // Set the name correctly
+        leaveGroup.addEventListener('click', () => leaveChatRoom(room.id, room.name));
+
+
+        // Append options to the dropdown
+        dropdown.appendChild(addMembers);
+        dropdown.appendChild(leaveGroup);
+
+        // Show dropdown on settings button click
+        settingsButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent click event from triggering other elements
+            
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            
+            // Get the position of the settings button
+            const rect = settingsButton.getBoundingClientRect();
+            
+        });
+        
+        // Close dropdown if clicked outside
+        document.addEventListener('click', (e) => {
+            if (!listItem.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Event listener for clicking on the chat room name
+        chatRoomName.addEventListener('click', () => {
+            selectChatRoom(room.id);
+
+            // Show the settings button for the selected chatroom
+            if (currentChatRoomId !== null) {
+                // Hide settings button for the previous chatroom
+                const previousChatRoom = document.querySelector(`li[data-chat-room-id="${currentChatRoomId}"] .settings-button`);
+                if (previousChatRoom) {
+                    previousChatRoom.style.display = 'none';
+                }
+            }
+
+            // Update the current chat room ID
+            currentChatRoomId = room.id;
+
+            // Show the settings button for the newly selected chatroom
+            settingsButton.style.display = 'inline-block';
+        });
+
+        // Append elements
+        listItem.appendChild(chatRoomName); // Append chat room name first
+        listItem.appendChild(settingsButton); // Then append settings button (hidden initially)
+        listItem.appendChild(dropdown); // Append dropdown to the list item
+        chatRoomList.appendChild(listItem);    
     });
+
+
 }
 
 // Handle incoming message for the current chat room
@@ -226,7 +311,7 @@ function selectChatRoom(chatRoomID) {
 
 // Fetch message history for a chat room
 function fetchMessageHistory(chatRoomID) {
-    fetch(`/messages/${chatRoomID}?userID=${userID}`, {
+    fetch(`/messages/${chatRoomID}`, {
         method: 'GET',
         credentials: 'include' // Ensure cookies are sent with the request
     })
@@ -329,14 +414,6 @@ function checkReadReceipts() {
 // Set up a periodic check for read receipts
 setInterval(checkReadReceipts, 5000);
 
-// Adjust scroll position based on read status
-function adjustScrollPosition(messages) {
-    // Scroll to the bottom if no messages are present or if scroll position is at the bottom
-    if (messages.length === 0 || chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight) {
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-}
-
 // Append a message to the chat box
 function appendMessageToChatBox(message) {
     const messageElement = document.createElement('div');
@@ -377,7 +454,6 @@ chatBox.addEventListener('scroll', function() {
     checkReadReceipts();
 });
 
-
 function adjustScrollPosition(messages) {
     // Find the index of the last read message
     const lastReadMessageIndex = messages.slice().reverse().findIndex(msg => msg.read_at !== '1970-01-01T00:00:00Z');
@@ -386,7 +462,10 @@ function adjustScrollPosition(messages) {
     // Find the index of the first unread message
     const firstUnreadMessageIndex = messages.findIndex(msg => msg.read_at === '1970-01-01T00:00:00Z');
 
-    if (adjustedLastReadIndex !== -1 && firstUnreadMessageIndex !== -1) {
+    if (messages.length === 0 || chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight) {
+        // If no messages or already scrolled to the bottom, scroll to the bottom
+        chatBox.scrollTop = chatBox.scrollHeight;
+    } else if (adjustedLastReadIndex !== -1 && firstUnreadMessageIndex !== -1) {
         // Calculate the midpoint between the last read and first unread message
         const midpointIndex = Math.floor((adjustedLastReadIndex + firstUnreadMessageIndex) / 2);
         const element = Array.from(chatBox.children)[midpointIndex];
@@ -395,10 +474,10 @@ function adjustScrollPosition(messages) {
             chatBox.scrollTop = element.offsetTop - chatBox.clientHeight / 2;
         }
     } else if (firstUnreadMessageIndex !== -1) {
-        // If only unread messages are present, scroll to the first unread message
+        // Scroll to the first unread message if present
         const element = Array.from(chatBox.children)[firstUnreadMessageIndex];
         if (element) {
-            console.log('scroll to first unread message half');
+            console.log('Scroll to first unread message');
             chatBox.scrollTop = element.offsetTop - chatBox.clientHeight / 2;
         }
     } else {
@@ -406,4 +485,3 @@ function adjustScrollPosition(messages) {
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 }
-

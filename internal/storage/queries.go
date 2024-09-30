@@ -1,4 +1,3 @@
-// queries.go
 package storage
 
 const (
@@ -12,6 +11,12 @@ const (
 		FROM chat_room_members 
 		WHERE user_id = $1 AND chat_room_id = $2
 		`
+// TODO: make isuserexist to use %like operator
+	IsUserExistsQuery = `
+	SELECT COUNT(*)
+	FROM users
+	WHERE username = $1
+	`
 
 	DeleteMessageQuery = `DELETE FROM messages WHERE message_id=$1 AND chat_room_id=$2`
 
@@ -23,5 +28,10 @@ const (
 	FROM chat_rooms cr
 	JOIN chat_room_members crm ON cr.id = crm.chat_room_id
 	WHERE crm.user_id = $1
+	`
+
+	DeleteUserFromChatRoomQuery = `
+	DELETE FROM chat_room_members 
+	WHERE user_id = $1 AND chat_room_id = $2
 	`
 )

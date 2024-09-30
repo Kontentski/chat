@@ -17,8 +17,11 @@ import (
 type UserStorage interface {
 	CreateUser(user *models.Users) error
 	IsUserInChatRoom(userID, chatRoomID uint) bool
+	IsUserExists(username string) bool
+	AddUserToTheChatRoom(userID, chatRoomID uint) error
+	DeleteUserFromChatRoom(ctx context.Context, IntuserID, chatRoomID uint) error
 	DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error
-	GetMessages(ctx context.Context ,userID string, chatRoomID string) ([]models.Messages, error)
+	GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error)
 	FetchUserChatRooms(userID uint) ([]models.ChatRooms, error)
 }
 
@@ -47,7 +50,25 @@ func (r *UserQuery) IsUserInChatRoom(userID, chatRoomID uint) bool {
 		return false
 	}
 	return count > 0
+}
 
+func (r *UserQuery) IsUserExists(username string) bool{
+	var count int
+    err := database.DB.QueryRow(context.Background(), IsUserExistsQuery, "%" + username + "%").Scan(&count)
+    if err!= nil {
+        log.Printf("Failed to find user with username %s: %v", username, err)
+        return false
+    }
+    return count > 0
+}
+
+func (r *UserQuery) AddUserToTheChatRoom(userID, chatroomID uint) error {
+	return nil
+}
+
+func (r *UserQuery) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error {
+	_, err := r.DB.Exec(ctx, DeleteUserFromChatRoomQuery, userID, chatRoomID)
+	return err
 }
 
 func (r *UserQuery) DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error {
@@ -73,9 +94,9 @@ func (r *UserQuery) DeleteMessage(ctx context.Context, messageID, chatRoomID uin
 	return nil
 }
 
-func (r *UserQuery) GetMessages(ctx context.Context, userID string, chatRoomID string) ([]models.Messages, error) {
+func (r *UserQuery) GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error) {
 	// Log the start of the query
-	log.Printf("GetMessages: Fetching messages for userID: %s in chatRoomID: %s", userID, chatRoomID)
+	log.Printf("GetMessages: Fetching messages for userID: %d in chatRoomID: %s", userID, chatRoomID)
 
 	// Execute the query
 	rows, err := r.DB.Query(ctx, GetMessagesQuery, userID, chatRoomID)

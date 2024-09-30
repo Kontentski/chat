@@ -52,6 +52,7 @@ func main() {
 
 	// Chat room endpoints
 	r.GET("/api/chatrooms", handlers.GetUserChatRoomsHandler(userService))
+	r.POST("/api/chatrooms/leave/:chatRoomID", handlers.LeaveTheChatRoomHandler(&userService))
 
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")

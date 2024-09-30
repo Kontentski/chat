@@ -28,6 +28,21 @@ func (m *MockUser) IsUserInChatRoom(userID, chatRoomID uint) bool {
 	}
 	return false
 }
+func (m *MockUser) IsUserExists(username string) bool {
+	args := m.Called(username)
+	return args.Get(0).(bool)
+}
+
+func (m *MockUser) AddUserToTheChatRoom(userID, chatroomID uint) error {
+	return nil
+}
+
+func (m *MockUser) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error{
+	args := m.Called(ctx, userID, chatRoomID)
+	return args.Error(0)
+}
+
+
 
 func (m *MockUser) DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error {
 	if m.DeleteMessageFn != nil {
@@ -36,7 +51,7 @@ func (m *MockUser) DeleteMessage(ctx context.Context, messageID, chatRoomID uint
 	return nil
 }
 
-func (m *MockUser) GetMessages(ctx context.Context, userID string, chatRoomID string) ([]models.Messages, error) {
+func (m *MockUser) GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error) {
 	args := m.Called(ctx, userID, chatRoomID)
 	return args.Get(0).([]models.Messages), args.Error(1)
 }
