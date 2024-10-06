@@ -52,7 +52,7 @@ function addMembersToGroup(chatRoomID) {
     userSearchResults.innerHTML = '';
 
     // Show the popup
-    popup.style.display = 'block';
+    popup.style.display = 'flex';
 
     // Close the popup when clicking the close button
     closeBtn.onclick = function() {
@@ -73,7 +73,7 @@ function addMembersToGroup(chatRoomID) {
         const searchQuery = searchBar.value.toLowerCase();
 
         // Fetch users from server or filter existing list (if available)
-        fetch(`/search-users?q=${searchQuery}`)
+        fetch(`/api/chatrooms/search-users?q=${searchQuery}`)
             .then(response => response.json())
             .then(users => {
                 // Clear previous results
@@ -86,7 +86,7 @@ function addMembersToGroup(chatRoomID) {
 
                     // Add click event to add the user to the group
                     listItem.addEventListener('click', () => {
-                        addUserToChatRoom(user.id, chatRoomID);
+                        addUserToChatRoom(user.user_id, chatRoomID);
                     });
 
                     userSearchResults.appendChild(listItem);
@@ -98,21 +98,24 @@ function addMembersToGroup(chatRoomID) {
 
 // Add the selected user to the chat room
 function addUserToChatRoom(userID, chatRoomID) {
-    fetch(`/chatroom/${chatRoomID}/add-user`, {
+    fetch('/api/chatrooms/add-user', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userID: userID }),
+        body: JSON.stringify({
+            user_id: userID,
+            chat_room_id: chatRoomID
+        }),
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
+        if (data.error) {
+            alert(`Error: ${data.error}`);
+        } else {
             alert('User added to the chat room');
             // Close popup
             document.getElementById('add-members-popup').style.display = 'none';
-        } else {
-            alert('Failed to add user to the chat room');
         }
     })
     .catch(error => console.error('Error adding user to chat room:', error));

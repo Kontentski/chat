@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>WebSocket Chat</title>
@@ -8,6 +9,7 @@
     <script src="popup.js" defer></script>
 
 </head>
+
 <body>
     <div id="chat-container">
         <div id="chat-info">
@@ -32,6 +34,23 @@
                 <input type="text" id="message-input" placeholder="Type your message here...">
                 <input type="submit" id="send-button" value="Send">
             </form>
+            <form id="upload-form" enctype="multipart/form-data">
+                <input type="file" id="file" name="file" style="display: none;" accept="image/*,video/*">
+                <button type="button" id="upload-btn">📎</button>
+            </form>
+
+            <script>
+                document.getElementById('upload-btn').onclick = function () {
+                    // When the upload button is clicked, open the file window
+                    document.getElementById('file').click();
+                };
+
+                document.getElementById('file').onchange = function (event) {
+                    const file = event.target.files[0];
+                    uploadFile(file);
+                };
+            </script>
+
         </div>
     </div>
     <div id="leave-group-popup" class="popup">
@@ -47,8 +66,8 @@
             <h3>Add Members to Group</h3>
             <input type="text" id="search-bar" placeholder="Search for users...">
             <ul id="user-search-results"></ul>
-            <button id="add-members-button">Add Members</button>
         </div>
     </div>
 </body>
+
 </html>

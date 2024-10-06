@@ -6,6 +6,8 @@ const (
 		VALUES ($1, $2, $3, $4, $5, NOW()) 
 		RETURNING id`
 
+	SearchUsersQuery = `SELECT id, username, name FROM users WHERE username LIKE $1`
+
 	IsUserInChatRoomQuery = `
 		SELECT COUNT(*) 
 		FROM chat_room_members 
@@ -17,7 +19,9 @@ const (
 	FROM users
 	WHERE username = $1
 	`
-
+	AddUserToTheChatRoomQuery = `
+	INSERT INTO chat_room_members (user_id, chat_room_id) VALUES ($1, $2)
+	`
 	DeleteMessageQuery = `DELETE FROM messages WHERE message_id=$1 AND chat_room_id=$2`
 
 	GetMessagesQuery = "SELECT m.message_id, m.sender_id, u.username, u.name, m.content, m.timestamp, m.chat_room_id, m.is_dm, COALESCE(r.read_at, '1970-01-01T00:00:00Z') AS read_at FROM messages m JOIN users u ON m.sender_id = u.id LEFT JOIN read_messages r ON m.message_id = r.message_id AND r.user_id = $1 AND m.chat_room_id = r.chat_room_id WHERE m.chat_room_id = $2 ORDER BY m.timestamp ASC"

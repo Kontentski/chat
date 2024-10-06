@@ -1,8 +1,10 @@
 package services
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -19,6 +21,15 @@ type DeleteMessageResponse struct {
 	MessageID  uint
 	ChatRoomID uint
 	SenderID   uint
+}
+type UsersListResponse struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Name     string `json:"name"`
+}
+type MediaStorage struct {
+	BucketName string
+	Client     *storage.Client
 }
 
 const UserIDKey = "userID"
@@ -61,7 +72,6 @@ func (s *UserChatRoomService) GetMessages(c *gin.Context) ([]models.Messages, er
 	if !s.UserRepo.IsUserInChatRoom(IntuserID, uint(strchatroomID)) {
 		return nil, errors.New("user not authorized")
 	}
-
 
 	return s.UserRepo.GetMessages(c.Request.Context(), IntuserID, chatRoomID)
 }
@@ -126,4 +136,55 @@ func (s *UserChatRoomService) LeaveChatRoom(c *gin.Context) error {
 		return errors.New("failed to leave the chat room")
 	}
 	return nil
+}
+
+func (s *UserChatRoomService) SearchUsers(c *gin.Context) (*[]UsersListResponse, error) {
+	query := c.Query("q")
+
+	if query == "" {
+		return nil, fmt.Errorf("missing search query")
+	}
+
+	users, err := s.UserRepo.SearchUsers(c, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	var usersListResponse []UsersListResponse
+	for _, user := range users {
+		usersListResponse = append(usersListResponse, UsersListResponse{
+			UserID:   fmt.Sprint(user.ID),
+			Username: user.Username,
+			Name:     user.Name,
+		})
+	}
+	return &usersListResponse, nil
+}
+
+func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Raw request body: %s\n", string(body))
+	c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(body)) // Restore the body for further use
+
+	var input struct {
+		UserID     string `json:"user_id" binding:"required"`
+		ChatRoomID uint `json:"chat_room_id" binding:"required"`
+	}
+	fmt.Printf("input waluesn4 %v\n\n:", input)
+
+	// Bind JSON input to the struct
+	if err := c.ShouldBindJSON(&input); err != nil {
+		fmt.Printf("input walues: %v\n\n\n", input)
+		return err // Return the error for the handler to process
+	}
+
+	// Call the repository or perform the logic to add the user to the chat room
+	err = s.UserRepo.AddUserToTheChatRoom(c, input.UserID, input.ChatRoomID)
+	if err != nil {
+		return err // Propagate the error back to the handler
+	}
+
+	return nil // Successful addition
 }

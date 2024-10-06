@@ -33,8 +33,14 @@ func (m *MockUser) IsUserExists(username string) bool {
 	return args.Get(0).(bool)
 }
 
-func (m *MockUser) AddUserToTheChatRoom(userID, chatroomID uint) error {
-	return nil
+func (m *MockUser) SearchUsers(ctx context.Context, query string) ([]models.Users, error) {
+	args := m.Called(ctx, query)
+	return args.Get(0).([]models.Users), args.Error(1)
+}
+
+func (m *MockUser) AddUserToTheChatRoom(ctx context.Context, userID string, chatRoomID uint) error {
+	args := m.Called(ctx, userID, chatRoomID)
+	return args.Error(0)
 }
 
 func (m *MockUser) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error{

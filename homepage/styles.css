@@ -16,7 +16,7 @@ body {
 #chat-info {
     display: flex; /* Make chat-info a flex container */
     flex-direction: column; /* Stack children vertically */
-    min-width: 500px; 
+    min-width: 300px; 
     padding: 0px 20px;
     background-color: #f0f0f0; 
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); 
@@ -136,10 +136,32 @@ body {
     text-align: center;
     width: 300px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    display: flex; /* Use flexbox for centering */
+    flex-direction: column; /* Stack items vertically */
+    align-items: center; /* Center items horizontally */
+    justify-content: center;
 }
 
 .popup-content button {
     margin: 10px;
     padding: 10px;
+    cursor: pointer;
+}
+
+#search-bar {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+}
+
+#user-search-results {
+    list-style-type: none;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: scroll;
+}
+
+#user-search-results li {
+    padding: 5px;
     cursor: pointer;
 }

@@ -18,7 +18,8 @@ type UserStorage interface {
 	CreateUser(user *models.Users) error
 	IsUserInChatRoom(userID, chatRoomID uint) bool
 	IsUserExists(username string) bool
-	AddUserToTheChatRoom(userID, chatRoomID uint) error
+	AddUserToTheChatRoom(ctx context.Context, userID string, chatRoomID uint) error
+	SearchUsers(ctx context.Context, q string) ([]models.Users, error)
 	DeleteUserFromChatRoom(ctx context.Context, IntuserID, chatRoomID uint) error
 	DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error
 	GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error)
@@ -39,6 +40,25 @@ func (r *UserQuery) CreateUser(user *models.Users) error {
 	return err
 }
 
+func (r *UserQuery) SearchUsers(ctx context.Context, q string) ([]models.Users, error) {
+	rows, err := r.DB.Query(ctx, SearchUsersQuery, "%"+q+"%")
+    if err!= nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var users []models.Users
+    for rows.Next() {
+        var user models.Users
+        if err := rows.Scan(&user.ID, &user.Username, &user.Name); err!= nil {
+            return nil, err
+        }
+        users = append(users, user)
+    }
+
+    return users, nil
+}
+
 func (r *UserQuery) IsUserInChatRoom(userID, chatRoomID uint) bool {
 
 	log.Println("query chat room")
@@ -52,18 +72,19 @@ func (r *UserQuery) IsUserInChatRoom(userID, chatRoomID uint) bool {
 	return count > 0
 }
 
-func (r *UserQuery) IsUserExists(username string) bool{
+func (r *UserQuery) IsUserExists(username string) bool {
 	var count int
-    err := database.DB.QueryRow(context.Background(), IsUserExistsQuery, "%" + username + "%").Scan(&count)
-    if err!= nil {
-        log.Printf("Failed to find user with username %s: %v", username, err)
-        return false
-    }
-    return count > 0
+	err := database.DB.QueryRow(context.Background(), IsUserExistsQuery, "%"+username+"%").Scan(&count)
+	if err != nil {
+		log.Printf("Failed to find user with username %s: %v", username, err)
+		return false
+	}
+	return count > 0
 }
 
-func (r *UserQuery) AddUserToTheChatRoom(userID, chatroomID uint) error {
-	return nil
+func (r *UserQuery) AddUserToTheChatRoom(ctx context.Context, userID string, chatRoomID uint) error {
+	_, err := database.DB.Exec(ctx, AddUserToTheChatRoomQuery, userID, chatRoomID)
+	return err
 }
 
 func (r *UserQuery) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error {
@@ -105,7 +126,6 @@ func (r *UserQuery) GetMessages(ctx context.Context, userID uint, chatRoomID str
 		return nil, err
 	}
 	defer rows.Close()
-
 
 	var messages []models.Messages
 	for rows.Next() {

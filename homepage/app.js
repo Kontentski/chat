@@ -82,6 +82,8 @@ function connectWebSocket() {
             handleChatRooms(data);
         } else if (data.type === "delete") {
             handleDeleteMessage(data.message_id, data.chat_room_id);
+        } else if (data.type === "image" || data.type === "video") {
+            handleMediaMessage(data);     
         } else if (data.chat_room_id === currentChatRoomID) {
             handleIncomingMessage(data);
         } else {
