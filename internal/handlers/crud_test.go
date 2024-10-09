@@ -237,21 +237,24 @@ func createTestContextWithParams(paramKey, paramValue, queryKey, queryValue stri
 	return c, w
 }
 
+func initTest()(*storage.MockUser, *storage.MockUser, *services.UserChatRoomService){
+	mockAuth := new(storage.MockUser)
+	mockRepo := new(storage.MockUser)
+	service := &services.UserChatRoomService{
+		UserRepo: mockRepo,
+		AuthRepo: mockAuth,
+	}
 
+	return mockAuth, mockRepo, service
+}
 func TestFetchUserChatRooms(t *testing.T) {
     // Create a test context
     gin.SetMode(gin.TestMode)
 
-    t.Run("Success - Valid Session and Chat Rooms Fetched", func(t *testing.T) {
-        // Initialize the mock objects
-        mockAuth := new(storage.MockUser)
-        mockRepo := new(storage.MockUser)
-        service := &services.UserChatRoomService{
-            UserRepo: mockRepo,
-            AuthRepo: mockAuth,
-        }
 
-        // Arrange
+    t.Run("Success - Valid Session and Chat Rooms Fetched", func(t *testing.T) {
+		mockAuth, mockRepo, service := initTest()
+		// Arrange
         userID := uint(123)
         sessionValues := map[string]interface{}{
             "userID": userID,
@@ -279,13 +282,7 @@ func TestFetchUserChatRooms(t *testing.T) {
     })
 
     t.Run("Error - Invalid Session (userID not found)", func(t *testing.T) {
-        // Initialize the mock objects
-        mockAuth := new(storage.MockUser)
-        mockRepo := new(storage.MockUser)
-        service := &services.UserChatRoomService{
-            UserRepo: mockRepo,
-            AuthRepo: mockAuth,
-        }
+		mockAuth, mockRepo, service := initTest()
 
         // Arrange
         sessionValues := map[string]interface{}{
@@ -312,14 +309,7 @@ func TestFetchUserChatRooms(t *testing.T) {
     })
 
     t.Run("Error - Failed to Fetch Chat Rooms from Repo", func(t *testing.T) {
-        // Initialize the mock objects
-        mockAuth := new(storage.MockUser)
-        mockRepo := new(storage.MockUser)
-        service := &services.UserChatRoomService{
-            UserRepo: mockRepo,
-            AuthRepo: mockAuth,
-        }
-
+		mockAuth, mockRepo, service := initTest()
         // Arrange
         userID := uint(123)
         sessionValues := map[string]interface{}{

@@ -19,7 +19,6 @@ func main() {
 	userStorage := &storage.UserQuery{
 		DB: database.DB,
 	}
-
 	authStorage := &storage.RealAuth{}
 	userService := services.UserChatRoomService{
 		UserRepo: userStorage,
@@ -32,7 +31,7 @@ func main() {
 	r.Static("/homepage", "./homepage")
 
 	// WebSocket endpoint
-	r.GET("/ws", func(c *gin.Context) {
+	r.GET("/ws", middleware.AuthMiddleware(auth.Store), func(c *gin.Context) {
 		handlers.HandleWebSocket(c.Writer, c.Request, &userService)
 	})
 
@@ -52,7 +51,10 @@ func main() {
 
 	// Chat room endpoints
 	r.GET("/api/chatrooms", handlers.GetUserChatRoomsHandler(userService))
-
+	r.POST("/api/chatrooms/leave/:chatRoomID", handlers.LeaveTheChatRoomHandler(&userService))
+	r.GET("/api/chatrooms/search-users", handlers.SearchUsersHandler(userService))
+	r.POST("/api/chatrooms/add-user", handlers.AddUserHandler(userService))
+	r.POST("/api/upload-media", handlers.UploadMediaHandler(userService))
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")
 	})
