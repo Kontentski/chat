@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kontentski/chat/internal/models"
@@ -26,10 +28,6 @@ type UsersListResponse struct {
 	UserID   string `json:"user_id"`
 	Username string `json:"username"`
 	Name     string `json:"name"`
-}
-type MediaStorage struct {
-	BucketName string
-	Client     *storage.Client
 }
 
 const UserIDKey = "userID"
@@ -161,16 +159,16 @@ func (s *UserChatRoomService) SearchUsers(c *gin.Context) (*[]UsersListResponse,
 }
 
 func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
-	body, err := ioutil.ReadAll(c.Request.Body)
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Raw request body: %s\n", string(body))
-	c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(body)) // Restore the body for further use
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(body)) // Restore the body for further use
 
 	var input struct {
 		UserID     string `json:"user_id" binding:"required"`
-		ChatRoomID uint `json:"chat_room_id" binding:"required"`
+		ChatRoomID uint   `json:"chat_room_id" binding:"required"`
 	}
 	fmt.Printf("input waluesn4 %v\n\n:", input)
 
@@ -187,4 +185,31 @@ func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
 	}
 
 	return nil // Successful addition
+}
+
+func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
+	chatRoomID := c.PostForm("chat_room_id")
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		return "", fmt.Errorf("failed to get file: %v", err)
+	}
+	defer file.Close()
+
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		return "", fmt.Errorf("no file extension found for filename: %s", header.Filename)
+	}
+
+	generatedFileName := fmt.Sprintf("%d%s", time.Now().Unix(), ext)
+
+	filePath := fmt.Sprintf("chatrooms/%s/%s", chatRoomID, generatedFileName)
+
+	// Upload the file using the repository function
+	// This method should return the file path, not the URL
+	filePath, err = s.UserRepo.UploadFileToBucket(file, header.Filename, filePath, c.Request.Context())
+	if err != nil {
+		return "", fmt.Errorf("failed to upload file: %v", err)
+	}
+
+	return filePath, nil
 }

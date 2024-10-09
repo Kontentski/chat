@@ -80,56 +80,48 @@ func DeleteMessageHandler(service *services.UserChatRoomService) gin.HandlerFunc
 func LeaveTheChatRoomHandler(service *services.UserChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := service.LeaveChatRoom(c)
-	    if err!= nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"message": "User left the chat room successfully"})
 	}
 }
 
 func SearchUsersHandler(service services.UserChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-        users, err := service.SearchUsers(c)
-        if err!= nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		users, err := service.SearchUsers(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        c.JSON(http.StatusOK, users)
-    }
+		c.JSON(http.StatusOK, users)
+	}
 }
 
 func AddUserHandler(service services.UserChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-        err := service.AddUserToChatRoom(c)
-        if err!= nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		err := service.AddUserToChatRoom(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        c.JSON(http.StatusOK, gin.H{"message": "User added successfully"})
-    }
+		c.JSON(http.StatusOK, gin.H{"message": "User added successfully"})
+	}
 }
 
-func UploadMediaHandler(c *gin.Context) {
-    file, header, err := c.Request.FormFile("file")
-    if err != nil {
-        utils.HandleError(c, http.StatusBadRequest, "Failed to get uploaded file")
-        return
-    }
-    defer file.Close()
+func UploadMediaHandler(service services.UserChatRoomService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		filePath, err := service.UploadMedia(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload media"})
+			return
+		}
 
-    // Call service to upload media
-    url, err := services.UploadMediaService(file, header.Filename)
-    if err != nil {
-        utils.HandleError(c, http.StatusInternalServerError, "Failed to upload media")
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{
-        "url": url,
-    })
+		c.JSON(http.StatusOK, gin.H{"filePath": filePath})
+	}
 }
 
 /* func FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {

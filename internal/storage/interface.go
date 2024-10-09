@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -24,6 +25,7 @@ type UserStorage interface {
 	DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error
 	GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error)
 	FetchUserChatRooms(userID uint) ([]models.ChatRooms, error)
+	UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error)
 }
 
 type AuthInterface interface {
@@ -42,21 +44,21 @@ func (r *UserQuery) CreateUser(user *models.Users) error {
 
 func (r *UserQuery) SearchUsers(ctx context.Context, q string) ([]models.Users, error) {
 	rows, err := r.DB.Query(ctx, SearchUsersQuery, "%"+q+"%")
-    if err!= nil {
-        return nil, err
-    }
-    defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var users []models.Users
-    for rows.Next() {
-        var user models.Users
-        if err := rows.Scan(&user.ID, &user.Username, &user.Name); err!= nil {
-            return nil, err
-        }
-        users = append(users, user)
-    }
+	var users []models.Users
+	for rows.Next() {
+		var user models.Users
+		if err := rows.Scan(&user.ID, &user.Username, &user.Name); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
 
-    return users, nil
+	return users, nil
 }
 
 func (r *UserQuery) IsUserInChatRoom(userID, chatRoomID uint) bool {
@@ -131,9 +133,21 @@ func (r *UserQuery) GetMessages(ctx context.Context, userID uint, chatRoomID str
 	for rows.Next() {
 		var msg models.Messages
 		var readAt sql.NullTime
+		var msgType sql.NullString  // Use sql.NullString for the type field
 
 		// Scan the row into the message struct
-		if err := rows.Scan(&msg.MessageID, &msg.SenderID, &msg.Sender.Username, &msg.Sender.Name, &msg.Content, &msg.Timestamp, &msg.ChatRoomID, &msg.IsDM, &readAt); err != nil {
+		if err := rows.Scan(
+			&msg.MessageID, 
+			&msg.SenderID, 
+			&msg.Sender.Username, 
+			&msg.Sender.Name, 
+			&msg.Content, 
+			&msg.Timestamp, 
+			&msg.ChatRoomID, 
+			&msg.IsDM, 
+			&msgType,  // Scan into msgType (sql.NullString)
+			&readAt,
+		); err != nil {
 			log.Printf("GetMessages: Error scanning row - %v", err)
 			return nil, err
 		}
@@ -143,6 +157,13 @@ func (r *UserQuery) GetMessages(ctx context.Context, userID uint, chatRoomID str
 			msg.ReadAt = readAt.Time.Format(time.RFC3339)
 		} else {
 			msg.ReadAt = "1970-01-01T00:00:00Z"
+		}
+
+		// Handle msgType field
+		if msgType.Valid {
+			msg.Type = msgType.String
+		} else {
+			msg.Type = ""  // or any default value you prefer
 		}
 
 		messages = append(messages, msg)

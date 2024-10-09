@@ -93,7 +93,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request, service *services.U
 	}
 	messageStorage := &storage.UserQuery{DB: database.DB}
 
-	go readMessages(conn, messageStorage)
+	readMessages(conn, messageStorage)
 	handleMessages(service)
 
 }

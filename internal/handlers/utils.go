@@ -77,11 +77,16 @@ func readMessages(conn *websocket.Conn, messageStorage storage.UserStorage) {
 
 		log.Printf("Received message")
 
-		if !messageStorage.IsUserInChatRoom(clientData.userID, msg.ChatRoomID) {
+		log.Printf("Received message data: %+v", msg)
+
+		chatRoomID := uint(data["chat_room_id"].(float64))
+		log.Printf("chat_room_id recieved message: %v", chatRoomID)
+
+		if !messageStorage.IsUserInChatRoom(clientData.userID, chatRoomID) {
 			log.Printf("User %d is not a member of chat room %d", clientData.userID, msg.ChatRoomID)
 			continue
 		}
-
+		log.Printf("saveng message:\n")
 		if err := saveMessageToDB(&msg); err != nil {
 			log.Printf("Error saving message to DB: %v", err)
 			continue
@@ -111,7 +116,11 @@ func markMessageAsRead(userID uint, messageID uint, chatRoomID uint) error {
 }
 
 func mapToStruct(data map[string]interface{}, target interface{}) error {
+	log.Printf("Raw incoming data: %+v", data)
+
 	encoded, err := json.Marshal(data)
+	log.Printf("Raw incoming data: %+v", encoded)
+
 	if err != nil {
 		return err
 	}
@@ -233,9 +242,9 @@ func saveMessageToDB(msg *models.Messages) error {
 	msg.MessageID = lastMessageID + 1
 	log.Printf("New message ID: %d", msg.MessageID)
 
-	insertQuery := `INSERT INTO messages (message_id, sender_id, content, chat_room_id, is_dm, timestamp) 
-                    VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING timestamp`
-	err = tx.QueryRow(context.Background(), insertQuery, msg.MessageID, msg.SenderID, msg.Content, msg.ChatRoomID, msg.IsDM).Scan(&msg.Timestamp)
+	insertQuery := `INSERT INTO messages (message_id, sender_id, content, chat_room_id, is_dm, timestamp, type) 
+                    VALUES ($1, $2, $3, $4, $5, NOW(), $6) RETURNING timestamp`
+	err = tx.QueryRow(context.Background(), insertQuery, msg.MessageID, msg.SenderID, msg.Content, msg.ChatRoomID, msg.IsDM, msg.Type).Scan(&msg.Timestamp)
 	if err != nil {
 		log.Printf("Error inserting message into DB: %v", err)
 		return err

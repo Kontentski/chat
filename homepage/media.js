@@ -1,9 +1,12 @@
 async function uploadFile(file) {
 	const formData = new FormData();
-	formData.append("file", file);
 
+	// Include the chatRoomID in the form data
+	formData.append("chat_room_id", currentChatRoomID);
+	formData.append("sender_id", userID);
+	formData.append("file", file);
 	// Send file to the server using fetch API
-	const response = await fetch("/upload-media", {
+	const response = await fetch("/api/upload-media", {
 		method: "POST",
 		body: formData,
 	});
@@ -17,20 +20,22 @@ async function uploadFile(file) {
 	socket.send(
 		JSON.stringify({
 			type: "media",
+			sender_id: userID,
+            chat_room_id: currentChatRoomID,
 			content: mediaUrl,
 		})
 	);
 }
 
-function handleMediaMessage(data) {
+/* function handleMediaMessage(data) {
 	const chatBox = document.getElementById("chat-box");
 
-	if (data.media_url && data.media_type) {
+	if (data.content && data.type) {
 		let mediaElement;
 
-		if (data.type === "image") {
+		if (data.type === "media") {
 			mediaElement = document.createElement("img");
-			mediaElement.src = data.media_url;
+			mediaElement.src = data.content;
 			mediaElement.alt = "Media Image";
 			mediaElement.style.maxWidth = "300px"; // Limit size
 		} else if (data.type === "video") {
@@ -48,3 +53,4 @@ function handleMediaMessage(data) {
 		console.error("Invalid media data received");
 	}
 }
+ */

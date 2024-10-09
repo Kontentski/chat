@@ -19,7 +19,6 @@ func main() {
 	userStorage := &storage.UserQuery{
 		DB: database.DB,
 	}
-
 	authStorage := &storage.RealAuth{}
 	userService := services.UserChatRoomService{
 		UserRepo: userStorage,
@@ -55,7 +54,7 @@ func main() {
 	r.POST("/api/chatrooms/leave/:chatRoomID", handlers.LeaveTheChatRoomHandler(&userService))
 	r.GET("/api/chatrooms/search-users", handlers.SearchUsersHandler(userService))
 	r.POST("/api/chatrooms/add-user", handlers.AddUserHandler(userService))
-	r.POST("/api/upload-media", handlers.UploadMediaHandler)
+	r.POST("/api/upload-media", handlers.UploadMediaHandler(userService))
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")
 	})
