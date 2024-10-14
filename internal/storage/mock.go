@@ -81,6 +81,12 @@ func (m *MockUser) UploadFileToBucket(file multipart.File, originalFileName, fil
     return m.Called(file, originalFileName, filePath, c).String(0), nil
 }
 
+func (m *MockUser) GenerateSignedURL(filePath string) (string, error) {
+	args := m.Called(filePath)
+	return args.String(0), args.Error(1)
+}
+
+
 type MockTransaction struct {
 	mock.Mock
 }

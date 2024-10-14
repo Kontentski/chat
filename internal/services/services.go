@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -71,7 +72,24 @@ func (s *UserChatRoomService) GetMessages(c *gin.Context) ([]models.Messages, er
 		return nil, errors.New("user not authorized")
 	}
 
-	return s.UserRepo.GetMessages(c.Request.Context(), IntuserID, chatRoomID)
+	messages, err := s.UserRepo.GetMessages(c.Request.Context(), IntuserID, chatRoomID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Process media messages
+	for i, msg := range messages {
+		if msg.Type == "media" {
+			signedURL, err := s.UserRepo.GenerateSignedURL(msg.Content)
+			if err != nil {
+				log.Printf("Error generating signed URL for message %d: %v", msg.MessageID, err)
+				continue
+			}
+			messages[i].Content = signedURL
+		}
+	}
+
+	return messages, nil
 }
 
 func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageResponse, error) {
@@ -212,4 +230,8 @@ func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
 	}
 
 	return filePath, nil
+}
+
+func (s *UserChatRoomService) GenerateSignedURL(filePath string) (string, error) {
+	return s.UserRepo.GenerateSignedURL(filePath)
 }

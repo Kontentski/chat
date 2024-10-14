@@ -429,62 +429,42 @@ setInterval(checkReadReceipts, 5000);
 // Append a message to the chat box
 function appendMessageToChatBox(message) {
     const messageElement = document.createElement("div");
-	if (message.content && message.type) {
-		let mediaElement;
+    messageElement.className = "message";
+    messageElement.dataset.messageId = message.message_id;
+    messageElement.dataset.readAt = message.read_at;
 
-		if (message.type === "media") {
-			mediaElement = document.createElement("img");
-			mediaElement.src = message.content;
-			mediaElement.alt = "Media Image";
-			mediaElement.style.maxWidth = "300px"; // Limit size
-		} else if (data.type === "video") {
-			mediaElement = document.createElement("video");
-			mediaElement.src = message.media_url;
-			mediaElement.controls = true;
-			mediaElement.style.maxWidth = "300px";
-		} else {
-			console.error("Unsupported media type:", data.media_type);
-			return;
-		}
+    if (message.type === "media") {
+        const mediaElement = document.createElement("img");
+        mediaElement.src = message.content;
+        mediaElement.alt = "Media Image";
+        mediaElement.style.maxWidth = "300px";
+        mediaElement.style.cursor = "pointer";
+        mediaElement.onclick = function() {
+            window.open(message.content, '_blank');
+        };
+        messageElement.appendChild(mediaElement);
+    } else {
+        messageElement.textContent = `${message.sender.name}: ${message.content}`;
+    }
 
-		chatBox.appendChild(mediaElement);
-	} else {
-		
-		messageElement.textContent = `${message.sender.name}: ${message.content}`;
+    if (message.read_at !== "1970-01-01T00:00:00Z") {
+        messageElement.style.backgroundColor = "#e0ffe0";
+    }
 
-		messageElement.dataset.messageId = message.message_id;
-		messageElement.dataset.readAt = message.read_at;
+    if (message.sender_id === userID) {
+        const deleteButton = document.createElement("button");
+        deleteButton.textContent = "Delete";
+        deleteButton.className = "delete-button";
+        deleteButton.addEventListener("click", () =>
+            deleteMessage(message.message_id, message.chat_room_id)
+        );
+        messageElement.appendChild(deleteButton);
+    }
 
-		if (message.read_at !== "1970-01-01T00:00:00Z") {
-			messageElement.style.backgroundColor = "#e0ffe0"; // Highlight read messages
-		}
+    chatBox.appendChild(messageElement);
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-		// Add delete button if the message was sent by the current user
-		if (message.sender_id === userID) {
-			const deleteButton = document.createElement("button");
-			deleteButton.textContent = "Delete";
-			deleteButton.className = "delete-button";
-			deleteButton.addEventListener("click", () =>
-				deleteMessage(message.message_id, message.chat_room_id)
-			);
-			messageElement.appendChild(deleteButton);
-			chatBox.scrollTop = chatBox.scrollHeight;
-		}
-
-		chatBox.appendChild(messageElement);
-
-		console.log("Appending message to chat box:", message);
-	}
-
-	// Check if the message is visible and send read receipt
-	if (isElementInViewport(messageElement)) {
-		if (
-			message.read_at === "1970-01-01T00:00:00Z" ||
-			message.read_at === null
-		) {
-			sendReadReceipt(message.message_id);
-		}
-	}
+    console.log("Appended message to chat box:", message);
 }
 
 // Handle scroll events to send read receipts for visible messages

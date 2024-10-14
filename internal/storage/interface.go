@@ -26,6 +26,7 @@ type UserStorage interface {
 	GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error)
 	FetchUserChatRooms(userID uint) ([]models.ChatRooms, error)
 	UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error)
+	GenerateSignedURL(filePath string) (string, error)
 }
 
 type AuthInterface interface {
