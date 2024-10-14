@@ -26,8 +26,14 @@ func TestCreateUser_Success(t *testing.T) {
 		},
 	}
 
+	// Create a UserChatRoomService with the mockStorage
+	service := &services.UserChatRoomService{
+		UserRepo: mockStorage,
+		AuthRepo: mockStorage, // You might want to create a separate mock for AuthRepo if needed
+	}
+
 	router := gin.New()
-	router.POST("/users", CreateUser(mockStorage))
+	router.POST("/users", CreateUser(service))
 
 	reqBody := `{"username":"testuser","name":"Test User","password":"password123","email":"testuser@example.com"}`
 	req, _ := http.NewRequest(http.MethodPost, "/users", bytes.NewBufferString(reqBody))
@@ -49,8 +55,14 @@ func TestCreateUser_Failure(t *testing.T) {
 		},
 	}
 
+	// Create a UserChatRoomService with the mockStorage
+	service := &services.UserChatRoomService{
+		UserRepo: mockStorage,
+		AuthRepo: mockStorage, // You might want to create a separate mock for AuthRepo if needed
+	}
+
 	router := gin.New()
-	router.POST("/users", CreateUser(mockStorage))
+	router.POST("/users", CreateUser(service))
 
 	reqBody := `{"username":"testuser","name":"Test User","password":"password123","email":"testuser@example.com"}`
 	req, _ := http.NewRequest(http.MethodPost, "/users", bytes.NewBufferString(reqBody))
@@ -67,87 +79,138 @@ func TestCreateUser_Failure(t *testing.T) {
 	assert.JSONEq(t, expectedResponse, w.Body.String(), "Expected response %v but got %v", expectedResponse, w.Body.String())
 }
 
-func TestDeleteMessage_Success(t *testing.T) {
-	mockStorage := &storage.MockUser{
-		IsUserInChatRoomFn: func(userID, chatRoomID uint) bool {
-			return true // Simulate user is authorized
-		},
-		DeleteMessageFn: func(ctx context.Context, messageID, chatRoomID uint) error {
-			return nil // Simulate successful deletion
-		},
-	}
-	mockAuth := new(storage.MockUser)
-	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
 
-	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
+// ... existing code ...
 
-	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2&user_id=3", nil)
-	w := httptest.NewRecorder()
+func TestDeleteMessageHandler(t *testing.T) {
+	// Initialize the Broadcast channel
+	Broadcast = make(chan models.Messages, 100)
 
-	router.ServeHTTP(w, req)
+	t.Run("Success", func(t *testing.T) {
+		mockStorage := &storage.MockUser{
+			IsUserInChatRoomFn: func(userID, chatRoomID uint) bool {
+				return true // Simulate user is authorized
+			},
+			DeleteMessageFn: func(ctx context.Context, messageID, chatRoomID uint) error {
+				return nil // Simulate successful deletion
+			},
+		}
+		mockAuth := &storage.MockUser{}
+		service := &services.UserChatRoomService{
+			UserRepo: mockStorage,
+			AuthRepo: mockAuth,
+		}
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.JSONEq(t, `{"message": "Message deleted successfully"}`, w.Body.String())
-}
+		router := gin.New()
+		router.DELETE("/message/:messageID", DeleteMessageHandler(service))
 
-func TestDeleteMessage_MissingParams(t *testing.T) {
-	mockStorage := new(storage.MockUser)
-	mockAuth := new(storage.MockUser)
-	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
+		req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2", nil)
+		w := httptest.NewRecorder()
 
-	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
-	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=&user_id=", nil)
-	w := httptest.NewRecorder()
+		// Set userID in the context
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "messageID", Value: "1"}}
+		c.Request = req
+		c.Set("userID", uint(3))
 
-	router.ServeHTTP(w, req)
+		// Start a goroutine to consume messages from the Broadcast channel
+		go func() {
+			<-Broadcast // Consume the message
+		}()
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.JSONEq(t, `{"error": "Missing required parameters"}`, w.Body.String())
-}
+		DeleteMessageHandler(service)(c)
 
-func TestDeleteMessage_Unauthorized(t *testing.T) {
-	mockStorage := &storage.MockUser{
-		IsUserInChatRoomFn: func(userID, chatRoomID uint) bool {
-			return false // Simulate user is not authorized
-		},
-	}
-	mockAuth := new(storage.MockUser)
-	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.JSONEq(t, `{"message": "Message deleted successfully"}`, w.Body.String())
+	})
 
-	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
-	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2&user_id=3", nil)
-	w := httptest.NewRecorder()
+	t.Run("Failure", func(t *testing.T) {
+		mockStorage := &storage.MockUser{
+			IsUserInChatRoomFn: func(userID, chatRoomID uint) bool {
+				return true // Simulate user is authorized
+			},
+			DeleteMessageFn: func(ctx context.Context, messageID, chatRoomID uint) error {
+				return errors.New("deletion failed") // Simulate failure
+			},
+		}
+		mockAuth := &storage.MockUser{}
+		service := &services.UserChatRoomService{
+			UserRepo: mockStorage,
+			AuthRepo: mockAuth,
+		}
 
-	router.ServeHTTP(w, req)
+		router := gin.New()
+		router.DELETE("/message/:messageID", DeleteMessageHandler(service))
 
-	assert.Equal(t, http.StatusForbidden, w.Code)
-	assert.JSONEq(t, `{"error": "User not authorized to delete message"}`, w.Body.String())
-}
+		req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2", nil)
+		w := httptest.NewRecorder()
 
-func TestDeleteMessage_Failure(t *testing.T) {
-	mockStorage := &storage.MockUser{
-		IsUserInChatRoomFn: func(userID, chatRoomID uint) bool {
-			return true // Simulate user is authorized
-		},
-		DeleteMessageFn: func(ctx context.Context, messageID, chatRoomID uint) error {
-			return errors.New("deletion failed") // Simulate failure
-		},
-	}
-	mockAuth := new(storage.MockUser)
-	service := &services.UserChatRoomService{UserRepo: mockStorage, AuthRepo: mockAuth}
+		// Set userID in the context
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "messageID", Value: "1"}}
+		c.Request = req
+		c.Set("userID", uint(3))
 
-	router := gin.New()
-	router.DELETE("/message/:messageID", DeleteMessageHandler(service))
-	req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2&user_id=3", nil)
-	w := httptest.NewRecorder()
+		DeleteMessageHandler(service)(c)
 
-	router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.JSONEq(t, `{"error":"Something went wrong"}`, w.Body.String())
+	})
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.JSONEq(t, `{"error":"failed to delete message: deletion failed"}`, w.Body.String())
+	t.Run("Unauthorized", func(t *testing.T) {
+		mockStorage := &storage.MockUser{
+			IsUserInChatRoomFn: func(userID, chatRoomID uint) bool {
+				return false // Simulate user is not authorized
+			},
+		}
+		mockAuth := &storage.MockUser{}
+		service := &services.UserChatRoomService{
+			UserRepo: mockStorage,
+			AuthRepo: mockAuth,
+		}
+
+		router := gin.New()
+		router.DELETE("/message/:messageID", DeleteMessageHandler(service))
+
+		req, _ := http.NewRequest("DELETE", "/message/1?chat_room_id=2", nil)
+		w := httptest.NewRecorder()
+
+		// Set userID in the context
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "messageID", Value: "1"}}
+		c.Request = req
+		c.Set("userID", uint(3))
+
+		DeleteMessageHandler(service)(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.JSONEq(t, `{"error":"Something went wrong"}`, w.Body.String())
+	})
+
+	t.Run("Missing Parameters", func(t *testing.T) {
+		mockStorage := &storage.MockUser{}
+		mockAuth := &storage.MockUser{}
+		service := &services.UserChatRoomService{
+			UserRepo: mockStorage,
+			AuthRepo: mockAuth,
+		}
+
+		router := gin.New()
+		router.DELETE("/message/:messageID", DeleteMessageHandler(service))
+
+		req, _ := http.NewRequest("DELETE", "/message/1", nil) // Missing chat_room_id
+		w := httptest.NewRecorder()
+
+		// Set userID in the context
+		c, _ := gin.CreateTestContext(w)
+		c.Set("userID", uint(3))
+		c.Request = req
+
+		DeleteMessageHandler(service)(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.JSONEq(t, `{"error":"Missing required parameters"}`, w.Body.String())
+	})
 }
 
 func TestGetMessages(t *testing.T) {

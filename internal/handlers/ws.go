@@ -91,7 +91,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request, service *services.U
 		log.Printf("Error sending user info: %v", err)
 		return
 	}
-	messageStorage := &storage.UserQuery{DB: database.DB}
+	messageStorage := &storage.PostgresRepository{DB: database.DB}
 
 	readMessages(conn, messageStorage)
 	handleMessages(service)

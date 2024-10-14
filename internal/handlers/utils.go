@@ -32,7 +32,7 @@ func handleConnection(conn *websocket.Conn) {
 	}()
 }
 
-func readMessages(conn *websocket.Conn, messageStorage storage.UserStorage) {
+func readMessages(conn *websocket.Conn, messageStorage storage.UserRepository) {
 	defer func() {
 		storage.UpdateLastSeen(clients[conn].userID)
 		conn.Close()

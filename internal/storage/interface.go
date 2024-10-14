@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/kontentski/chat/internal/models"
 )
 
-type UserStorage interface {
+type UserRepository interface {
 	CreateUser(user *models.Users) error
 	IsUserInChatRoom(userID, chatRoomID uint) bool
 	IsUserExists(username string) bool
@@ -25,25 +24,23 @@ type UserStorage interface {
 	DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error
 	GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error)
 	FetchUserChatRooms(userID uint) ([]models.ChatRooms, error)
-	UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error)
-	GenerateSignedURL(filePath string) (string, error)
 }
 
-type AuthInterface interface {
+type AuthRepository interface {
 	GetSession(req *http.Request) (map[string]interface{}, error)
 }
 
-type UserQuery struct {
+type PostgresRepository struct {
 	DB *pgxpool.Pool
 }
 
-func (r *UserQuery) CreateUser(user *models.Users) error {
+func (r *PostgresRepository) CreateUser(user *models.Users) error {
 	err := r.DB.QueryRow(context.Background(), CreateUserQuery, user.Username, user.Name, user.Password, user.Email, user.ProfilePicture).Scan(&user.ID)
 
 	return err
 }
 
-func (r *UserQuery) SearchUsers(ctx context.Context, q string) ([]models.Users, error) {
+func (r *PostgresRepository) SearchUsers(ctx context.Context, q string) ([]models.Users, error) {
 	rows, err := r.DB.Query(ctx, SearchUsersQuery, "%"+q+"%")
 	if err != nil {
 		return nil, err
@@ -62,7 +59,7 @@ func (r *UserQuery) SearchUsers(ctx context.Context, q string) ([]models.Users, 
 	return users, nil
 }
 
-func (r *UserQuery) IsUserInChatRoom(userID, chatRoomID uint) bool {
+func (r *PostgresRepository) IsUserInChatRoom(userID, chatRoomID uint) bool {
 
 	log.Println("query chat room")
 
@@ -75,7 +72,7 @@ func (r *UserQuery) IsUserInChatRoom(userID, chatRoomID uint) bool {
 	return count > 0
 }
 
-func (r *UserQuery) IsUserExists(username string) bool {
+func (r *PostgresRepository) IsUserExists(username string) bool {
 	var count int
 	err := database.DB.QueryRow(context.Background(), IsUserExistsQuery, "%"+username+"%").Scan(&count)
 	if err != nil {
@@ -85,17 +82,17 @@ func (r *UserQuery) IsUserExists(username string) bool {
 	return count > 0
 }
 
-func (r *UserQuery) AddUserToTheChatRoom(ctx context.Context, userID string, chatRoomID uint) error {
+func (r *PostgresRepository) AddUserToTheChatRoom(ctx context.Context, userID string, chatRoomID uint) error {
 	_, err := database.DB.Exec(ctx, AddUserToTheChatRoomQuery, userID, chatRoomID)
 	return err
 }
 
-func (r *UserQuery) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error {
+func (r *PostgresRepository) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error {
 	_, err := r.DB.Exec(ctx, DeleteUserFromChatRoomQuery, userID, chatRoomID)
 	return err
 }
 
-func (r *UserQuery) DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error {
+func (r *PostgresRepository) DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error {
 	// Begin a transaction to ensure atomic operation
 	tx, err := r.DB.Begin(ctx)
 	if err != nil {
@@ -118,7 +115,7 @@ func (r *UserQuery) DeleteMessage(ctx context.Context, messageID, chatRoomID uin
 	return nil
 }
 
-func (r *UserQuery) GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error) {
+func (r *PostgresRepository) GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error) {
 	// Log the start of the query
 	log.Printf("GetMessages: Fetching messages for userID: %d in chatRoomID: %s", userID, chatRoomID)
 
@@ -182,7 +179,7 @@ func (r *UserQuery) GetMessages(ctx context.Context, userID uint, chatRoomID str
 	return messages, nil
 }
 
-func (r *UserQuery) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
+func (r *PostgresRepository) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
 	rows, err := r.DB.Query(context.Background(), FetchUserChatRoomsQuery, userID)
 	if err != nil {
 		return nil, err

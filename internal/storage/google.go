@@ -17,6 +17,15 @@ import (
 	"google.golang.org/api/option"
 )
 
+type BucketStorage interface {
+	UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error)
+	GenerateSignedURL(filePath string) (string, error)
+}
+
+type GoogleUpload struct {
+	
+}
+
 func NewStorageClient() (*buck.Client, error) {
 	fmt.Printf("new storage client\n")
 	client, err := buck.NewClient(context.Background(), option.WithCredentialsFile("/home/kontentski/Documents/programing/github/chat/KEY_S3.json"))
@@ -33,7 +42,7 @@ var (
 	bucketName = "chat-app-bucket-1"
 )
 
-func (r *UserQuery) UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error) {
+func (GoogleUpload) UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error) {
 	client, err := NewStorageClient()
 	if err != nil {
 		return "", fmt.Errorf("failed to create storage client: %v", err)
@@ -80,7 +89,7 @@ func (r *UserQuery) UploadFileToBucket(file multipart.File, originalFileName, fi
 	return filePath, nil
 }
 
-func (r *UserQuery) GenerateSignedURL(filePath string) (string, error) {
+func (GoogleUpload) GenerateSignedURL(filePath string) (string, error) {
 	fmt.Printf("Generating signed URL for filePath: %s\n", filePath)
 
 	ctx := context.Background()

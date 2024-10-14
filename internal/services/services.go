@@ -17,9 +17,11 @@ import (
 )
 
 type UserChatRoomService struct {
-	UserRepo storage.UserStorage
-	AuthRepo storage.AuthInterface
+	UserRepo     storage.UserRepository
+	AuthRepo     storage.AuthRepository
+	MediaStorage storage.BucketStorage
 }
+
 type DeleteMessageResponse struct {
 	MessageID  uint
 	ChatRoomID uint
@@ -32,6 +34,15 @@ type UsersListResponse struct {
 }
 
 const UserIDKey = "userID"
+
+
+func NewUserChatRoomService(userRepo storage.UserRepository, authRepo storage.AuthRepository, mediaStorage storage.BucketStorage) *UserChatRoomService {
+	return &UserChatRoomService{
+		UserRepo:     userRepo,
+		AuthRepo:     authRepo,
+		MediaStorage: mediaStorage,
+	}
+}
 
 // FetchUserChatRooms retrieves the user's chat rooms by processing the session.
 func (s *UserChatRoomService) FetchUserChatRooms(req *http.Request) ([]models.ChatRooms, error) {
@@ -80,7 +91,7 @@ func (s *UserChatRoomService) GetMessages(c *gin.Context) ([]models.Messages, er
 	// Process media messages
 	for i, msg := range messages {
 		if msg.Type == "media" {
-			signedURL, err := s.UserRepo.GenerateSignedURL(msg.Content)
+			signedURL, err := s.MediaStorage.GenerateSignedURL(msg.Content)
 			if err != nil {
 				log.Printf("Error generating signed URL for message %d: %v", msg.MessageID, err)
 				continue
@@ -224,7 +235,7 @@ func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
 
 	// Upload the file using the repository function
 	// This method should return the file path, not the URL
-	filePath, err = s.UserRepo.UploadFileToBucket(file, header.Filename, filePath, c.Request.Context())
+	filePath, err = s.MediaStorage.UploadFileToBucket(file, header.Filename, filePath, c.Request.Context())
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file: %v", err)
 	}
@@ -233,5 +244,5 @@ func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
 }
 
 func (s *UserChatRoomService) GenerateSignedURL(filePath string) (string, error) {
-	return s.UserRepo.GenerateSignedURL(filePath)
+	return s.MediaStorage.GenerateSignedURL(filePath)
 }

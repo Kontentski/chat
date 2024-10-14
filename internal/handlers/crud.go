@@ -7,10 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kontentski/chat/internal/models"
 	"github.com/kontentski/chat/internal/services"
-	"github.com/kontentski/chat/internal/storage"
 )
 
-func CreateUser(userStorage storage.UserStorage) gin.HandlerFunc {
+func CreateUser(service *services.UserChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var user models.Users
 
@@ -19,7 +18,7 @@ func CreateUser(userStorage storage.UserStorage) gin.HandlerFunc {
 			return
 		}
 
-		err := userStorage.CreateUser(&user)
+		err := service.UserRepo.CreateUser(&user)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -60,7 +59,7 @@ func DeleteMessageHandler(service *services.UserChatRoomService) gin.HandlerFunc
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required parameters"})
 			} else {
 				log.Println(err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Something went wrong"})
 			}
 			return
 		}

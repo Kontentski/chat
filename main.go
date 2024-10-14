@@ -16,14 +16,12 @@ import (
 func main() {
 	database.Init()
 	database.RunMigrations()
-	userStorage := &storage.UserQuery{
+	userRepo := &storage.PostgresRepository{
 		DB: database.DB,
 	}
-	authStorage := &storage.RealAuth{}
-	userService := services.UserChatRoomService{
-		UserRepo: userStorage,
-		AuthRepo: authStorage,
-	}
+	authRepo := &storage.RealAuth{}
+	bucketStorage := &storage.GoogleUpload{}
+	userService := services.NewUserChatRoomService(userRepo, authRepo, bucketStorage)
 	auth.Init()
 
 	r := gin.Default()
@@ -32,7 +30,7 @@ func main() {
 
 	// WebSocket endpoint
 	r.GET("/ws", middleware.AuthMiddleware(auth.Store), func(c *gin.Context) {
-		handlers.HandleWebSocket(c.Writer, c.Request, &userService)
+		handlers.HandleWebSocket(c.Writer, c.Request, userService)
 	})
 
 	// Authentication routes
@@ -43,18 +41,18 @@ func main() {
 	r.POST("/auth/logout", handlers.LogoutHandler)
 
 	r.Use(middleware.AuthMiddleware(auth.Store))
-	r.POST("/users", handlers.CreateUser(userStorage))
+	r.POST("/users", handlers.CreateUser(userService))
 
 	// Message endpoints
-	r.GET("/messages/:chatRoomID", handlers.GetMessagesHandler(userService))
-	r.DELETE("/messages/:messageID", handlers.DeleteMessageHandler(&userService))
+	r.GET("/messages/:chatRoomID", handlers.GetMessagesHandler(*userService))
+	r.DELETE("/messages/:messageID", handlers.DeleteMessageHandler(userService))
 
 	// Chat room endpoints
-	r.GET("/api/chatrooms", handlers.GetUserChatRoomsHandler(userService))
-	r.POST("/api/chatrooms/leave/:chatRoomID", handlers.LeaveTheChatRoomHandler(&userService))
-	r.GET("/api/chatrooms/search-users", handlers.SearchUsersHandler(userService))
-	r.POST("/api/chatrooms/add-user", handlers.AddUserHandler(userService))
-	r.POST("/api/upload-media", handlers.UploadMediaHandler(userService))
+	r.GET("/api/chatrooms", handlers.GetUserChatRoomsHandler(*userService))
+	r.POST("/api/chatrooms/leave/:chatRoomID", handlers.LeaveTheChatRoomHandler(userService))
+	r.GET("/api/chatrooms/search-users", handlers.SearchUsersHandler(*userService))
+	r.POST("/api/chatrooms/add-user", handlers.AddUserHandler(*userService))
+	r.POST("/api/upload-media", handlers.UploadMediaHandler(*userService))
 	r.GET("/hello", func(c *gin.Context) {
 		c.String(200, "Hello, World!")
 	})

@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"mime/multipart"
 	"net/http"
 
 	"github.com/kontentski/chat/internal/models"
@@ -73,7 +72,7 @@ func (m *MockUser) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
 	}
 	return nil, fmt.Errorf("database error")
 }
-
+/* 
 func (m *MockUser) UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error){
 	if m.Called(file, originalFileName, filePath, c).Error(1)!= nil {
         return "", m.Called(file, originalFileName, filePath, c).Error(1)
@@ -85,7 +84,7 @@ func (m *MockUser) GenerateSignedURL(filePath string) (string, error) {
 	args := m.Called(filePath)
 	return args.String(0), args.Error(1)
 }
-
+ */
 
 type MockTransaction struct {
 	mock.Mock
