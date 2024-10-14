@@ -22,7 +22,7 @@ type Messages struct {
 	IsDM       bool      `json:"is_dm"`
 	ReadAt     string    `json:"read_at"`
 	Sender     Users     `json:"sender"`
-	Type       string    `json:"type"`
+	Type       string    `json:"type,omitempty"`
 }
 
 type ChatRooms struct {

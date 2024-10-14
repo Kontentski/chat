@@ -1,51 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>WebSocket Chat</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        #chat-box {
-            border: 1px solid #ccc;
-            height: 400px;
-            overflow-y: scroll;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        #message-form {
-            display: flex;
-            gap: 10px;
-        }
-        #message-input {
-            flex: 1;
-        }
-        #chat-room-list {
-            margin-bottom: 20px;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css"> <!-- Link to the external CSS file -->
     <script src="app.js" defer></script>
+    <script src="popup.js" defer></script>
+    <script src="media.js" defer></script>
+
 </head>
+
 <body>
-    <button id="google-login">Login with Google</button>
-    <button id="logout-button" style="display: none;">Logout</button>
-    <h1>Chat Room</h1>
-    <div id="user-info">
-        <p id="user-username">Username: </p>
-        <p id="user-name">Name: </p>
+    <div id="chat-container">
+        <div id="chat-info">
+            <div id="user-info">
+                <button id="google-login">Login with Google</button>
+                <button id="logout-button" style="display: none;">Logout</button>
+                <h1>Chat Room</h1>
+                <p id="user-username">Username: </p>
+                <p id="user-name">Name: </p>
+            </div>
+            <div id="chat-room-list">
+                <h2>Chat Rooms</h2>
+                <ul id="chat-room-list-items">
+                </ul>
+            </div>
+        </div>
+        <div id="chat-box-container">
+            <div id="chat-box">
+                <p>Welcome! Select a chat room to start.</p>
+            </div>
+            <form id="message-form">
+                <input type="text" id="message-input" placeholder="Type your message here...">
+                <input type="submit" id="send-button" value="Send">
+            </form>
+            <form id="upload-form" enctype="multipart/form-data">
+                <input type="file" id="file" name="file" style="display: none;" accept="image/*,video/*">
+                <button type="button" id="upload-btn">📎</button>
+            </form>
+
+            <script>
+                document.getElementById('upload-btn').onclick = function () {
+                    // When the upload button is clicked, open the file window
+                    document.getElementById('file').click();
+                };
+
+                document.getElementById('file').onchange = function (event) {
+                    event.preventDefault();
+                    const file = event.target.files[0];
+                    uploadFile(file);
+                };
+            </script>
+
+        </div>
     </div>
-    <div id="chat-room-list">
-        <h2>Chat Rooms</h2>
-        <ul id="chat-room-list-items"></ul>
+    <div id="leave-group-popup" class="popup">
+        <div class="popup-content">
+            <p id="leave-group-text"></p>
+            <button id="confirm-leave">Leave</button>
+            <button id="cancel-leave">Cancel</button>
+        </div>
     </div>
-    <div id="chat-box">
-        <p>Welcome! Select a chat room to start.</p>
+    <div id="add-members-popup" class="popup">
+        <div class="popup-content">
+            <span class="close-btn">&times;</span>
+            <h3>Add Members to Group</h3>
+            <input type="text" id="search-bar" placeholder="Search for users...">
+            <ul id="user-search-results"></ul>
+        </div>
     </div>
-    <form id="message-form">
-        <input type="text" id="message-input" placeholder="Type your message here...">
-        <input type="submit" id="send-button" value="Send"></input>
-    </form>
 </body>
+
 </html>

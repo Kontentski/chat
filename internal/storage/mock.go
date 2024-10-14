@@ -28,6 +28,25 @@ func (m *MockUser) IsUserInChatRoom(userID, chatRoomID uint) bool {
 	}
 	return false
 }
+func (m *MockUser) IsUserExists(username string) bool {
+	args := m.Called(username)
+	return args.Get(0).(bool)
+}
+
+func (m *MockUser) SearchUsers(ctx context.Context, query string) ([]models.Users, error) {
+	args := m.Called(ctx, query)
+	return args.Get(0).([]models.Users), args.Error(1)
+}
+
+func (m *MockUser) AddUserToTheChatRoom(ctx context.Context, userID string, chatRoomID uint) error {
+	args := m.Called(ctx, userID, chatRoomID)
+	return args.Error(0)
+}
+
+func (m *MockUser) DeleteUserFromChatRoom(ctx context.Context, userID, chatRoomID uint) error {
+	args := m.Called(ctx, userID, chatRoomID)
+	return args.Error(0)
+}
 
 func (m *MockUser) DeleteMessage(ctx context.Context, messageID, chatRoomID uint) error {
 	if m.DeleteMessageFn != nil {
@@ -36,7 +55,7 @@ func (m *MockUser) DeleteMessage(ctx context.Context, messageID, chatRoomID uint
 	return nil
 }
 
-func (m *MockUser) GetMessages(ctx context.Context, userID string, chatRoomID string) ([]models.Messages, error) {
+func (m *MockUser) GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error) {
 	args := m.Called(ctx, userID, chatRoomID)
 	return args.Get(0).([]models.Messages), args.Error(1)
 }
@@ -53,6 +72,19 @@ func (m *MockUser) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
 	}
 	return nil, fmt.Errorf("database error")
 }
+/* 
+func (m *MockUser) UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error){
+	if m.Called(file, originalFileName, filePath, c).Error(1)!= nil {
+        return "", m.Called(file, originalFileName, filePath, c).Error(1)
+    }
+    return m.Called(file, originalFileName, filePath, c).String(0), nil
+}
+
+func (m *MockUser) GenerateSignedURL(filePath string) (string, error) {
+	args := m.Called(filePath)
+	return args.String(0), args.Error(1)
+}
+ */
 
 type MockTransaction struct {
 	mock.Mock
