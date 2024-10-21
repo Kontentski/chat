@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -50,9 +51,12 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request, service *services.U
 		log.Printf("Failed to get session: %v", err)
 		return
 	}
+	sess :=fmt.Sprintf("sessions/%v", session)
+	fmt.Println(sess)
 
 	userID, ok := session.Values["userID"].(uint)
 	if !ok {
+		log.Printf("userID %d\n\n\n", userID)
 		log.Println("No userID in session")
 		return
 	}
@@ -87,9 +91,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request, service *services.U
 		log.Printf("Error sending user info: %v", err)
 		return
 	}
-	messageStorage := &storage.UserQuery{DB: database.DB}
+	messageStorage := &storage.PostgresRepository{DB: database.DB}
 
-	go readMessages(conn, messageStorage)
+	readMessages(conn, messageStorage)
 	handleMessages(service)
 
 }
