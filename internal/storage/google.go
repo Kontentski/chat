@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"time"
 
 	"net/http"
@@ -18,17 +17,16 @@ import (
 )
 
 type BucketStorage interface {
-	UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error)
+	UploadFileToBucket(file io.Reader, originalFileName, filePath string, c context.Context) (string, error)
 	GenerateSignedURL(filePath string) (string, error)
 }
 
 type GoogleUpload struct {
-	
 }
 
 func NewStorageClient() (*buck.Client, error) {
 	fmt.Printf("new storage client\n")
-	client, err := buck.NewClient(context.Background(), option.WithCredentialsFile("/home/kontentski/Documents/programing/github/chat/KEY_S3.json"))
+	client, err := buck.NewClient(context.Background(), option.WithCredentialsFile("/home/kontentski/programming/chat/KEY_S3.json"))
 
 	if err != nil {
 		fmt.Printf("Error creating storage client: %v\n", err) // Log the error
@@ -42,7 +40,7 @@ var (
 	bucketName = "chat-app-bucket-1"
 )
 
-func (GoogleUpload) UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error) {
+func (GoogleUpload) UploadFileToBucket(file io.Reader, originalFileName, filePath string, c context.Context) (string, error) {
 	client, err := NewStorageClient()
 	if err != nil {
 		return "", fmt.Errorf("failed to create storage client: %v", err)
@@ -93,7 +91,7 @@ func (GoogleUpload) GenerateSignedURL(filePath string) (string, error) {
 	fmt.Printf("Generating signed URL for filePath: %s\n", filePath)
 
 	ctx := context.Background()
-	client, err := buck.NewClient(ctx, option.WithCredentialsFile("/home/kontentski/Documents/programing/github/chat/KEY_S3.json"))
+	client, err := buck.NewClient(ctx, option.WithCredentialsFile("/home/kontentski/programming/chat/KEY_S3.json"))
 	if err != nil {
 		return "", fmt.Errorf("failed to create storage client: %v", err)
 	}

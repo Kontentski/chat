@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 
 	"github.com/kontentski/chat/internal/models"
@@ -22,12 +24,16 @@ func (m *MockUser) CreateUser(user *models.Users) error {
 	}
 	return nil
 }
+
 func (m *MockUser) IsUserInChatRoom(userID, chatRoomID uint) bool {
+	log.Printf("MockUser.IsUserInChatRoom called with userID: %d, chatRoomID: %d", userID, chatRoomID)
 	if m.IsUserInChatRoomFn != nil {
 		return m.IsUserInChatRoomFn(userID, chatRoomID)
 	}
-	return false
+	args := m.Called(userID, chatRoomID)
+	return args.Bool(0)
 }
+
 func (m *MockUser) IsUserExists(username string) bool {
 	args := m.Called(username)
 	return args.Get(0).(bool)
@@ -57,7 +63,10 @@ func (m *MockUser) DeleteMessage(ctx context.Context, messageID, chatRoomID uint
 
 func (m *MockUser) GetMessages(ctx context.Context, userID uint, chatRoomID string) ([]models.Messages, error) {
 	args := m.Called(ctx, userID, chatRoomID)
-	return args.Get(0).([]models.Messages), args.Error(1)
+	if messages, ok := args.Get(0).([]models.Messages); ok {
+		return messages, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 func (m *MockUser) GetSession(req *http.Request) (map[string]interface{}, error) {
@@ -72,7 +81,8 @@ func (m *MockUser) FetchUserChatRooms(userID uint) ([]models.ChatRooms, error) {
 	}
 	return nil, fmt.Errorf("database error")
 }
-/* 
+
+/*
 func (m *MockUser) UploadFileToBucket(file multipart.File, originalFileName, filePath string, c context.Context) (string, error){
 	if m.Called(file, originalFileName, filePath, c).Error(1)!= nil {
         return "", m.Called(file, originalFileName, filePath, c).Error(1)
@@ -84,7 +94,7 @@ func (m *MockUser) GenerateSignedURL(filePath string) (string, error) {
 	args := m.Called(filePath)
 	return args.String(0), args.Error(1)
 }
- */
+*/
 
 type MockTransaction struct {
 	mock.Mock
@@ -101,4 +111,18 @@ func (m *MockTransaction) Commit(ctx context.Context) error {
 
 func (m *MockTransaction) Rollback(ctx context.Context) error {
 	return m.Called(ctx).Error(0)
+}
+
+type MockBucketStorage struct {
+	mock.Mock
+}
+
+func (m *MockBucketStorage) UploadFileToBucket(file io.Reader, originalFileName, filePath string, c context.Context) (string, error) {
+	args := m.Called(file, originalFileName, filePath, c)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockBucketStorage) GenerateSignedURL(filePath string) (string, error) {
+	args := m.Called(filePath)
+	return args.String(0), args.Error(1)
 }
