@@ -58,7 +58,6 @@ func (s *UserChatRoomService) FetchUserChatRooms(req *http.Request) ([]models.Ch
 		return nil, fmt.Errorf("unauthorized: userID not found in session")
 	}
 
-	// Fetch chat rooms for the user from the repository
 	return s.UserRepo.FetchUserChatRooms(userID)
 }
 
@@ -131,7 +130,6 @@ func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageRespo
 		return nil, errors.New("user not authorized")
 	}
 
-	// Delete the message
 	if err := s.UserRepo.DeleteMessage(c.Request.Context(), uint(messageID), uint(chatRoomID)); err != nil {
 		return nil, fmt.Errorf("failed to delete message: %w", err)
 	}
@@ -193,7 +191,7 @@ func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
 		return err
 	}
 	fmt.Printf("Raw request body: %s\n", string(body))
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(body)) // Restore the body for further use
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	var input struct {
 		UserID     string `json:"user_id" binding:"required"`
@@ -201,19 +199,17 @@ func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
 	}
 	fmt.Printf("input waluesn4 %v\n\n:", input)
 
-	// Bind JSON input to the struct
 	if err := c.ShouldBindJSON(&input); err != nil {
 		fmt.Printf("input walues: %v\n\n\n", input)
-		return err // Return the error for the handler to process
+		return err
 	}
 
-	// Call the repository or perform the logic to add the user to the chat room
 	err = s.UserRepo.AddUserToTheChatRoom(c, input.UserID, input.ChatRoomID)
 	if err != nil {
-		return err // Propagate the error back to the handler
+		return err
 	}
 
-	return nil // Successful addition
+	return nil
 }
 
 func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
@@ -230,11 +226,9 @@ func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
 	}
 
 	generatedFileName := fmt.Sprintf("%d%s", time.Now().Unix(), ext)
-
+	//filepath == chatrooms/1/09238450934.jpg
 	filePath := fmt.Sprintf("chatrooms/%s/%s", chatRoomID, generatedFileName)
 
-	// Upload the file using the repository function
-	// This method should return the file path, not the URL
 	filePath, err = s.MediaStorage.UploadFileToBucket(file, header.Filename, filePath, c.Request.Context())
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file: %v", err)

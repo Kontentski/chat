@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -428,5 +429,110 @@ func TestFetchUserChatRooms(t *testing.T) {
 		// Verify expectations were met
 		mockAuth.AssertExpectations(t)
 		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestGenerateSignedURL(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStorage := new(storage.MockBucketStorage)
+		mockStorage.On("GenerateSignedURL", "testfile.jpg").Return("http://signed.url/to/file.jpg", nil) // Set expectation
+
+		service := &services.UserChatRoomService{
+			MediaStorage: mockStorage,
+		}
+
+		// Call the method directly
+		url, err := service.MediaStorage.GenerateSignedURL("testfile.jpg")
+		assert.NoError(t, err)
+		assert.Equal(t, "http://signed.url/to/file.jpg", url)
+
+		mockStorage.AssertExpectations(t) // Assert that the expectations were met
+	})
+
+	t.Run("Failure - URL Generation Error", func(t *testing.T) {
+		mockStorage := new(storage.MockBucketStorage)
+		mockStorage.On("GenerateSignedURL", "testfile.jpg").Return("", fmt.Errorf("url generation error")) // Set expectation
+
+		service := &services.UserChatRoomService{
+			MediaStorage: mockStorage,
+		}
+
+		// Call the method directly
+		url, err := service.MediaStorage.GenerateSignedURL("testfile.jpg")
+		assert.Error(t, err)
+		assert.EqualError(t, err, "url generation error")
+		assert.Empty(t, url)
+
+		mockStorage.AssertExpectations(t) // Assert that the expectations were met
+	})
+}
+
+func TestUploadMediaHandler(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStorage := new(storage.MockBucketStorage)
+		mockStorage.On("UploadFileToBucket", mock.Anything, "testfile.jpg", mock.Anything, mock.Anything).Return("chatrooms/1/09238450934.jpg", nil) // Use mock.Anything for the file and context
+
+		service := services.UserChatRoomService{
+			MediaStorage: mockStorage,
+		}
+
+		router := gin.New()
+		router.POST("/upload", UploadMediaHandler(service))
+
+		// Create a test request with a file
+		reqBody := &bytes.Buffer{}
+		writer := multipart.NewWriter(reqBody)
+		fileWriter, err := writer.CreateFormFile("file", "testfile.jpg")
+		assert.NoError(t, err)
+		_, err = fileWriter.Write([]byte("test content"))
+		assert.NoError(t, err)
+		writer.WriteField("chat_room_id", "1")
+		writer.Close()
+
+		req, _ := http.NewRequest(http.MethodPost, "/upload", reqBody)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		expectedResponse := `{"filePath":"chatrooms/1/09238450934.jpg"}`
+		assert.JSONEq(t, expectedResponse, w.Body.String())
+
+		mockStorage.AssertExpectations(t) // Assert that the expectations were met
+	})
+
+	t.Run("Failure - Upload Error", func(t *testing.T) {
+		mockStorage := new(storage.MockBucketStorage)
+		mockStorage.On("UploadFileToBucket", mock.Anything, "testfile.jpg", mock.Anything, mock.Anything).Return("", fmt.Errorf("upload error")) // Use mock.Anything for the file and context
+
+		service := services.UserChatRoomService{
+			MediaStorage: mockStorage,
+		}
+
+		router := gin.New()
+		router.POST("/upload", UploadMediaHandler(service))
+
+		// Create a test request with a file
+		reqBody := &bytes.Buffer{}
+		writer := multipart.NewWriter(reqBody)
+		fileWriter, err := writer.CreateFormFile("file", "testfile.jpg")
+		assert.NoError(t, err)
+		_, err = fileWriter.Write([]byte("test content"))
+		assert.NoError(t, err)
+		writer.WriteField("chat_room_id", "1")
+		writer.Close()
+
+		req, _ := http.NewRequest(http.MethodPost, "/upload", reqBody)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		expectedResponse := `{"error":"Failed to upload media"}`
+		assert.JSONEq(t, expectedResponse, w.Body.String())
+
+		mockStorage.AssertExpectations(t) // Assert that the expectations were met
 	})
 }
