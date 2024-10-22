@@ -55,12 +55,11 @@ func (GoogleUpload) UploadFileToBucket(file io.Reader, originalFileName, filePat
 	// Upload the file with write permissions
 	writer := client.Bucket(bucketName).Object(filePath).NewWriter(c)
 	writer.ContentType = contentType                                                     // Set the correct content type
-	writer.ContentDisposition = fmt.Sprintf("inline; filename=\"%s\"", originalFileName) // Change to inline
+	writer.ContentDisposition = fmt.Sprintf("inline; filename=\"%s\"", originalFileName)
 	writer.Metadata = map[string]string{
 		"originalFilename": originalFileName,
 	}
 
-	// Read file into a buffer
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, file)
 	if err != nil {
@@ -81,8 +80,6 @@ func (GoogleUpload) UploadFileToBucket(file io.Reader, originalFileName, filePat
 		return "", fmt.Errorf("failed to close writer: %v", err)
 	}
 	fmt.Println("Writer closed successfully")
-
-	// Generate a signed URL (valid for 15 minutes)
 
 	return filePath, nil
 }
@@ -114,7 +111,6 @@ func (GoogleUpload) GenerateSignedURL(filePath string) (string, error) {
 	return url, nil
 }
 
-// Add this helper function
 func getContentType(filename string) string {
 	ext := filepath.Ext(filename)
 	switch strings.ToLower(ext) {
@@ -126,48 +122,7 @@ func getContentType(filename string) string {
 		return "image/gif"
 	case ".mp4":
 		return "video/mp4"
-	// Add more types as needed
 	default:
 		return "application/octet-stream"
 	}
 }
-
-/* func NewMediaStorage(bucketName string) (*MediaStorage, error) {
-	// Initialize the Google Cloud Storage client
-	client, err := storage.NewClient(context.Background(), option.WithCredentialsFile("/home/kontentski/Documents/programing/github/chat/KEY_S3.json"))
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create storage client: %v", err)
-	}
-
-	return &MediaStorage{
-		BucketName: bucketName,
-		Client:     client,
-	}, nil
-}
-
-// UploadFile uploads the file to Google Cloud Storage
-func (m *MediaStorage) UploadFile(file multipart.File, fileHeader *multipart.FileHeader, filePath string) (string, error) {
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
-	defer cancel()
-
-	// Define the object (file) that will be uploaded
-	wc := m.Client.Bucket(m.BucketName).Object(filePath).NewWriter(ctx)
-
-	// Set the content type (e.g., image/jpeg, video/mp4)
-	wc.ContentType = fileHeader.Header.Get("Content-Type")
-
-	// Copy the file's content to the GCS writer
-	if _, err := io.Copy(wc, file); err != nil {
-		return "", fmt.Errorf("Failed to copy file: %v", err)
-	}
-
-	// Close the writer
-	if err := wc.Close(); err != nil {
-		return "", fmt.Errorf("Failed to close writer: %v", err)
-	}
-
-	// Return the public URL of the uploaded file
-	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", m.BucketName, filePath), nil
-}
-*/
