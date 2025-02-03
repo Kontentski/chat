@@ -1,0 +1,320 @@
+basePath: /
+definitions:
+  models.ChatRooms:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+  models.Messages:
+    properties:
+      chat_room_id:
+        type: integer
+      content:
+        type: string
+      is_dm:
+        type: boolean
+      message_id:
+        type: integer
+      read_at:
+        type: string
+      sender:
+        $ref: '#/definitions/models.Users'
+      sender_id:
+        type: integer
+      timestamp:
+        type: string
+      type:
+        type: string
+    type: object
+  models.Users:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      last_seen:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      profile_picture:
+        type: string
+      username:
+        type: string
+    type: object
+  services.UsersListResponse:
+    properties:
+      name:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A chat service that uses websockets and gin
+  title: chat API
+  version: "1.4"
+paths:
+  /api/chatrooms:
+    get:
+      description: retrieve chat rooms for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ChatRooms'
+            type: array
+        "401":
+          description: Unauthenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get user chat rooms
+      tags:
+      - users
+  /api/chatrooms/add-user:
+    post:
+      consumes:
+      - application/json
+      description: Add user to an existing chat room
+      parameters:
+      - description: Add user request
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: User added successfully'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Add user to chat room
+      tags:
+      - chatrooms
+  /api/chatrooms/leave/{chatRoomID}:
+    post:
+      description: Leaves
+      parameters:
+      - description: chatroom to leave
+        in: path
+        name: chatRoomID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: User left the chat room successfully'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      tags:
+      - chatrooms
+  /api/chatrooms/search-users:
+    get:
+      description: Search for users by query string
+      parameters:
+      - description: Search users
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/services.UsersListResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Search users
+      tags:
+      - users
+  /messages/{chatRoomID}:
+    get:
+      description: retrieve messages from a specific chat
+      parameters:
+      - description: Chat Room ID
+        in: path
+        name: chatRoomID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Messages'
+            type: array
+        "401":
+          description: Unauthenticated
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get messages
+      tags:
+      - messages
+  /messages/{messageID}:
+    delete:
+      description: Deletes selected message
+      parameters:
+      - description: message to delete
+        in: path
+        name: messageID
+        required: true
+        type: integer
+      - description: chatroom id
+        in: query
+        name: chat_room_id
+        required: true
+        type: integer
+      - description: user id
+        in: query
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete messages
+      tags:
+      - messages
+  /users:
+    post:
+      consumes:
+      - application/json
+      description: creates a new user in the system
+      parameters:
+      - description: User information
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.Users'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new user
+      tags:
+      - users
+schemes:
+- http
+securityDefinitions:
+  ApiKeyAuth:
+    description: Session cookie for authentication. you need to manually add the session
+      to the Cookie storage in your browser
+    in: header
+    name: Cookie
+    type: apiKey
+swagger: "2.0"

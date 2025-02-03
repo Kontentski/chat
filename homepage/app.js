@@ -433,6 +433,16 @@ function appendMessageToChatBox(message) {
     messageElement.dataset.messageId = message.message_id;
     messageElement.dataset.readAt = message.read_at;
 
+    // Check if the message is sent by the user
+    const isUserMessage = message.sender_id === userID;
+
+    // Add class for user messages
+    if (isUserMessage) {
+        messageElement.classList.add("user-message");
+    } else {
+        messageElement.classList.add("other-message");
+    }
+
     if (message.type === "media") {
         const mediaElement = document.createElement("img");
         mediaElement.src = message.content;
@@ -455,10 +465,14 @@ function appendMessageToChatBox(message) {
         // Optionally, handle image load error
         mediaElement.onerror = function() {
             console.error("Error loading image:", message.content);
-            // You can also display a placeholder or error message here if needed
         };
     } else {
-        messageElement.textContent = `${message.sender.name}: ${message.content}`;
+        // Only show the sender's name for messages not sent by the user
+        if (!isUserMessage) {
+            messageElement.textContent = `${message.sender.name}: ${message.content}`;
+        } else {
+            messageElement.textContent = message.content; // Just show the content for user messages
+        }
         chatBox.appendChild(messageElement);
         adjustScrollPosition([...chatBox.children]); // Call adjustScrollPosition for text messages
     }
@@ -467,7 +481,7 @@ function appendMessageToChatBox(message) {
         messageElement.style.backgroundColor = "#e0ffe0";
     }
 
-    if (message.sender_id === userID) {
+    if (isUserMessage) {
         const deleteButton = document.createElement("button");
         deleteButton.textContent = "Delete";
         deleteButton.className = "delete-button";

@@ -34,7 +34,7 @@ var (
 )
 
 // HandleWebSocket handles WebSocket requests
-func HandleWebSocket(w http.ResponseWriter, r *http.Request, service *services.UserChatRoomService) {
+func HandleWebSocket(w http.ResponseWriter, r *http.Request, service services.ChatRoomService) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade to WebSocket: %v", err)

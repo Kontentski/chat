@@ -59,10 +59,11 @@ body {
 
 #chat-box {
     flex: 1;
-    border: 1px solid #ccc;
     padding: 10px;
     overflow-y: scroll;
     margin-bottom: 10px;
+    max-width: 800px;
+    height: 90vh;
 }
 
 #message-form {
@@ -164,4 +165,43 @@ body {
 #user-search-results li {
     padding: 5px;
     cursor: pointer;
+}
+
+.message {
+    max-width: 70%; /* Limit the width of messages */
+    margin: 5px; /* Add some margin */
+    padding: 10px; /* Add padding for better appearance */
+    border-radius: 10px; /* Rounded corners */
+    word-wrap: break-word; /* Allow long words to break */
+}
+
+.user-message {
+    background-color: #dcf8c6; /* Light green background for user messages */
+    align-self: flex-end; /* Align user messages to the right */
+    text-align: right; /* Align text to the right */
+}
+
+.other-message {
+    background-color: #f1f0f0; /* Light gray background for other messages */
+    align-self: flex-start; /* Align other messages to the left */
+    text-align: left; /* Align text to the left */
+}
+
+/* Ensure the chat box uses flexbox for alignment */
+#chat-box {
+    display: flex;
+    flex-direction: column; /* Stack messages vertically */
+    overflow-y: auto; /* Allow scrolling */
+}
+
+.chat-box-wrapper {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    height: 100vh;
+    width: 100%; /* Ensure it takes full width up to the max-width */
+    margin-left: auto; /* Center the wrapper */
+    margin-right: auto; /* Center the wrapper */
+    padding: 10px; /* Optional: Add some padding */
+
 }

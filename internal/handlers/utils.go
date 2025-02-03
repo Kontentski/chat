@@ -146,7 +146,7 @@ func mapToStruct(data map[string]interface{}, target interface{}) error {
 	return json.Unmarshal(encoded, target)
 }
 
-func handleMessages(service *services.UserChatRoomService) {
+func handleMessages(service services.ChatRoomService) {
 	for msg := range Broadcast {
 
 		if msg.Type == "delete" {
