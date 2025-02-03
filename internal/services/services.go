@@ -16,10 +16,23 @@ import (
 	"github.com/kontentski/chat/internal/storage"
 )
 
-type UserChatRoomService struct {
-	UserRepo     storage.UserRepository
-	AuthRepo     storage.AuthRepository
-	MediaStorage storage.BucketStorage
+type ChatRoomService interface {
+	FetchUserChatRooms(req *http.Request) ([]models.ChatRooms, error)
+	FetchUserChatRoomsByUserID(userID uint) ([]models.ChatRooms, error)
+	GetMessages(c *gin.Context) ([]models.Messages, error)
+	DeleteMessage(c *gin.Context) (*DeleteMessageResponse, error)
+	LeaveChatRoom(c *gin.Context) error
+	SearchUsers(c *gin.Context) (*[]UsersListResponse, error)
+	AddUserToChatRoom(c *gin.Context) error
+	UploadMedia(c *gin.Context) (string, error)
+	GenerateSignedURL(filePath string) (string, error)
+	CreateUser(user *models.Users) error
+}
+
+type UserChatRoomServiceImpl struct {
+    UserRepo     storage.UserRepository
+    AuthRepo     storage.AuthRepository
+    MediaStorage storage.BucketStorage
 }
 
 type DeleteMessageResponse struct {
@@ -36,8 +49,8 @@ type UsersListResponse struct {
 const UserIDKey = "userID"
 
 
-func NewUserChatRoomService(userRepo storage.UserRepository, authRepo storage.AuthRepository, mediaStorage storage.BucketStorage) *UserChatRoomService {
-	return &UserChatRoomService{
+func NewUserChatRoomService(userRepo storage.UserRepository, authRepo storage.AuthRepository, mediaStorage storage.BucketStorage) ChatRoomService {
+	return &UserChatRoomServiceImpl{
 		UserRepo:     userRepo,
 		AuthRepo:     authRepo,
 		MediaStorage: mediaStorage,
@@ -45,7 +58,7 @@ func NewUserChatRoomService(userRepo storage.UserRepository, authRepo storage.Au
 }
 
 // FetchUserChatRooms retrieves the user's chat rooms by processing the session.
-func (s *UserChatRoomService) FetchUserChatRooms(req *http.Request) ([]models.ChatRooms, error) {
+func (s *UserChatRoomServiceImpl) FetchUserChatRooms(req *http.Request) ([]models.ChatRooms, error) {
 	// Retrieve session values via the AuthInterface
 	sessionValues, err := s.AuthRepo.GetSession(req)
 	if err != nil {
@@ -61,12 +74,12 @@ func (s *UserChatRoomService) FetchUserChatRooms(req *http.Request) ([]models.Ch
 	return s.UserRepo.FetchUserChatRooms(userID)
 }
 
-func (s *UserChatRoomService) FetchUserChatRoomsByUserID(userID uint) ([]models.ChatRooms, error) {
+func (s *UserChatRoomServiceImpl) FetchUserChatRoomsByUserID(userID uint) ([]models.ChatRooms, error) {
 	// Fetch chat rooms for the user from the repository
 	return s.UserRepo.FetchUserChatRooms(userID)
 }
 
-func (s *UserChatRoomService) GetMessages(c *gin.Context) ([]models.Messages, error) {
+func (s *UserChatRoomServiceImpl) GetMessages(c *gin.Context) ([]models.Messages, error) {
 	chatRoomID := c.Param("chatRoomID")
 	userID, ok := c.Get(UserIDKey)
 	if !ok {
@@ -102,7 +115,7 @@ func (s *UserChatRoomService) GetMessages(c *gin.Context) ([]models.Messages, er
 	return messages, nil
 }
 
-func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageResponse, error) {
+func (s *UserChatRoomServiceImpl) DeleteMessage(c *gin.Context) (*DeleteMessageResponse, error) {
 	messageIDStr := c.Param("messageID")
 	chatRoomIDStr := c.Query("chat_room_id")
 	userID, ok := c.Get(UserIDKey)
@@ -140,7 +153,7 @@ func (s *UserChatRoomService) DeleteMessage(c *gin.Context) (*DeleteMessageRespo
 	}, nil
 }
 
-func (s *UserChatRoomService) LeaveChatRoom(c *gin.Context) error {
+func (s *UserChatRoomServiceImpl) LeaveChatRoom(c *gin.Context) error {
 	chatRoomIDStr := c.Param("chatRoomID")
 	userID, ok := c.Get(UserIDKey)
 	if !ok {
@@ -163,7 +176,7 @@ func (s *UserChatRoomService) LeaveChatRoom(c *gin.Context) error {
 	return nil
 }
 
-func (s *UserChatRoomService) SearchUsers(c *gin.Context) (*[]UsersListResponse, error) {
+func (s *UserChatRoomServiceImpl) SearchUsers(c *gin.Context) (*[]UsersListResponse, error) {
 	query := c.Query("q")
 
 	if query == "" {
@@ -185,7 +198,7 @@ func (s *UserChatRoomService) SearchUsers(c *gin.Context) (*[]UsersListResponse,
 	return &usersListResponse, nil
 }
 
-func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
+func (s *UserChatRoomServiceImpl) AddUserToChatRoom(c *gin.Context) error {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		return err
@@ -212,7 +225,7 @@ func (s *UserChatRoomService) AddUserToChatRoom(c *gin.Context) error {
 	return nil
 }
 
-func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
+func (s *UserChatRoomServiceImpl) UploadMedia(c *gin.Context) (string, error) {
 	chatRoomID := c.PostForm("chat_room_id")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -237,6 +250,10 @@ func (s *UserChatRoomService) UploadMedia(c *gin.Context) (string, error) {
 	return filePath, nil
 }
 
-func (s *UserChatRoomService) GenerateSignedURL(filePath string) (string, error) {
+func (s *UserChatRoomServiceImpl) GenerateSignedURL(filePath string) (string, error) {
 	return s.MediaStorage.GenerateSignedURL(filePath)
+}
+
+func (s *UserChatRoomServiceImpl) CreateUser(user *models.Users) error {
+	return s.UserRepo.CreateUser(user)
 }

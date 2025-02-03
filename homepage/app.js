@@ -433,6 +433,16 @@ function appendMessageToChatBox(message) {
     messageElement.dataset.messageId = message.message_id;
     messageElement.dataset.readAt = message.read_at;
 
+    // Check if the message is sent by the user
+    const isUserMessage = message.sender_id === userID;
+
+    // Add class for user messages
+    if (isUserMessage) {
+        messageElement.classList.add("user-message");
+    } else {
+        messageElement.classList.add("other-message");
+    }
+
     if (message.type === "media") {
         const mediaElement = document.createElement("img");
         mediaElement.src = message.content;
@@ -442,16 +452,36 @@ function appendMessageToChatBox(message) {
         mediaElement.onclick = function() {
             window.open(message.content, '_blank');
         };
+
+        // Append the media element immediately
         messageElement.appendChild(mediaElement);
+        chatBox.appendChild(messageElement); // Append the message element first
+
+        // Wait for the image to load before adjusting scroll position
+        mediaElement.onload = function() {
+            adjustScrollPosition([...chatBox.children]); // Call adjustScrollPosition after image loads
+        };
+
+        // Optionally, handle image load error
+        mediaElement.onerror = function() {
+            console.error("Error loading image:", message.content);
+        };
     } else {
-        messageElement.textContent = `${message.sender.name}: ${message.content}`;
+        // Only show the sender's name for messages not sent by the user
+        if (!isUserMessage) {
+            messageElement.textContent = `${message.sender.name}: ${message.content}`;
+        } else {
+            messageElement.textContent = message.content; // Just show the content for user messages
+        }
+        chatBox.appendChild(messageElement);
+        adjustScrollPosition([...chatBox.children]); // Call adjustScrollPosition for text messages
     }
 
     if (message.read_at !== "1970-01-01T00:00:00Z") {
         messageElement.style.backgroundColor = "#e0ffe0";
     }
 
-    if (message.sender_id === userID) {
+    if (isUserMessage) {
         const deleteButton = document.createElement("button");
         deleteButton.textContent = "Delete";
         deleteButton.className = "delete-button";
@@ -461,10 +491,10 @@ function appendMessageToChatBox(message) {
         messageElement.appendChild(deleteButton);
     }
 
-    chatBox.appendChild(messageElement);
-    chatBox.scrollTop = chatBox.scrollHeight;
-
-    console.log("Appended message to chat box:", message);
+    // Adjust scroll position for text messages immediately
+    if (message.type !== "media") {
+        chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom for text messages
+    }
 }
 
 // Handle scroll events to send read receipts for visible messages
@@ -478,23 +508,36 @@ function adjustScrollPosition(messages) {
 		.slice()
 		.reverse()
 		.findIndex((msg) => msg.read_at !== "1970-01-01T00:00:00Z");
+	console.log("Last read message index (reversed):", lastReadMessageIndex);
+
 	const adjustedLastReadIndex =
 		lastReadMessageIndex !== -1
 			? messages.length - 1 - lastReadMessageIndex
 			: -1;
+	console.log("Adjusted last read message index:", adjustedLastReadIndex);
 
 	// Find the index of the first unread message
 	const firstUnreadMessageIndex = messages.findIndex(
 		(msg) => msg.read_at === "1970-01-01T00:00:00Z"
 	);
+	console.log("First unread message index:", firstUnreadMessageIndex);
 
-	if (
-		messages.length === 0 ||
-		chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight
-	) {
-		// If no messages or already scrolled to the bottom, scroll to the bottom
-		chatBox.scrollTop = chatBox.scrollHeight;
-	} else if (adjustedLastReadIndex !== -1 && firstUnreadMessageIndex !== -1) {
+	// Log scroll position details
+	console.log("Scroll Top:", chatBox.scrollTop);
+	console.log("Client Height:", chatBox.clientHeight);
+	console.log("Scroll Height:", chatBox.scrollHeight);
+
+	if (messages.length === 0) {
+		console.log("No messages to display.");
+		return; // No messages to adjust scroll position
+	}
+
+	if (chatBox.scrollHeight <= chatBox.clientHeight) {
+		console.log("Chat box content fits within the visible area. No scrolling needed.");
+		return; // Content fits, no need to scroll
+	}
+
+	if (adjustedLastReadIndex !== -1 && firstUnreadMessageIndex !== -1) {
 		// Calculate the midpoint between the last read and first unread message
 		const midpointIndex = Math.floor(
 			(adjustedLastReadIndex + firstUnreadMessageIndex) / 2
@@ -502,17 +545,23 @@ function adjustScrollPosition(messages) {
 		const element = Array.from(chatBox.children)[midpointIndex];
 
 		if (element) {
+			console.log("Scrolling to midpoint index:", midpointIndex);
 			chatBox.scrollTop = element.offsetTop - chatBox.clientHeight / 2;
+		} else {
+			console.log("No element found at midpoint index:", midpointIndex);
 		}
 	} else if (firstUnreadMessageIndex !== -1) {
 		// Scroll to the first unread message if present
 		const element = Array.from(chatBox.children)[firstUnreadMessageIndex];
 		if (element) {
-			console.log("Scroll to first unread message");
+			console.log("Scroll to first unread message at index:", firstUnreadMessageIndex);
 			chatBox.scrollTop = element.offsetTop - chatBox.clientHeight / 2;
+		} else {
+			console.log("No element found at first unread message index:", firstUnreadMessageIndex);
 		}
 	} else {
 		// If all messages are read, scroll to the bottom
+		console.log("All messages are read. Scrolling to bottom.");
 		chatBox.scrollTop = chatBox.scrollHeight;
 	}
 }

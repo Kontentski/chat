@@ -29,7 +29,7 @@ func TestCreateUser_Success(t *testing.T) {
 	}
 
 	// Create a UserChatRoomService with the mockStorage
-	service := &services.UserChatRoomService{
+	service := &services.UserChatRoomServiceImpl{
 		UserRepo: mockStorage,
 		AuthRepo: mockStorage, // You might want to create a separate mock for AuthRepo if needed
 	}
@@ -58,7 +58,7 @@ func TestCreateUser_Failure(t *testing.T) {
 	}
 
 	// Create a UserChatRoomService with the mockStorage
-	service := &services.UserChatRoomService{
+	service := &services.UserChatRoomServiceImpl{
 		UserRepo: mockStorage,
 		AuthRepo: mockStorage, // You might want to create a separate mock for AuthRepo if needed
 	}
@@ -97,7 +97,7 @@ func TestDeleteMessageHandler(t *testing.T) {
 			},
 		}
 		mockAuth := &storage.MockUser{}
-		service := &services.UserChatRoomService{
+		service := &services.UserChatRoomServiceImpl{
 			UserRepo: mockStorage,
 			AuthRepo: mockAuth,
 		}
@@ -135,7 +135,7 @@ func TestDeleteMessageHandler(t *testing.T) {
 			},
 		}
 		mockAuth := &storage.MockUser{}
-		service := &services.UserChatRoomService{
+		service := &services.UserChatRoomServiceImpl{
 			UserRepo: mockStorage,
 			AuthRepo: mockAuth,
 		}
@@ -165,7 +165,7 @@ func TestDeleteMessageHandler(t *testing.T) {
 			},
 		}
 		mockAuth := &storage.MockUser{}
-		service := &services.UserChatRoomService{
+		service := &services.UserChatRoomServiceImpl{
 			UserRepo: mockStorage,
 			AuthRepo: mockAuth,
 		}
@@ -191,7 +191,7 @@ func TestDeleteMessageHandler(t *testing.T) {
 	t.Run("Missing Parameters", func(t *testing.T) {
 		mockStorage := &storage.MockUser{}
 		mockAuth := &storage.MockUser{}
-		service := &services.UserChatRoomService{
+		service := &services.UserChatRoomServiceImpl{
 			UserRepo: mockStorage,
 			AuthRepo: mockAuth,
 		}
@@ -246,7 +246,7 @@ func TestGetMessagesHandler(t *testing.T) {
 
 		log.Println("TestGetMessagesHandler/Success: Calling handler")
 		// Act
-		GetMessagesHandler(*service)(c)
+		GetMessagesHandler(service)(c)
 
 		// Assert
 		log.Printf("TestGetMessagesHandler/Success: Response status: %d", w.Code)
@@ -280,7 +280,7 @@ func TestGetMessagesHandler(t *testing.T) {
 		c.Request = req
 
 		// Act
-		GetMessagesHandler(*service)(c)
+		GetMessagesHandler(service)(c)
 
 		// Assert
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -318,7 +318,7 @@ func TestGetMessagesHandler(t *testing.T) {
 		service.UserRepo = mockRepo
 
 		// Act
-		GetMessagesHandler(*service)(c)
+		GetMessagesHandler(service)(c)
 
 		// Assert
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -330,11 +330,11 @@ func TestGetMessagesHandler(t *testing.T) {
 	})
 }
 
-func initTest() (*storage.MockUser, *storage.MockUser, *services.UserChatRoomService) {
+func initTest() (*storage.MockUser, *storage.MockUser, *services.UserChatRoomServiceImpl) {
 	mockAuth := new(storage.MockUser)
 	mockRepo := new(storage.MockUser)
 	mediaStorage := new(storage.MockBucketStorage)
-	service := &services.UserChatRoomService{
+	service := &services.UserChatRoomServiceImpl{
 		UserRepo:     mockRepo,
 		AuthRepo:     mockAuth,
 		MediaStorage: mediaStorage,
@@ -437,7 +437,7 @@ func TestGenerateSignedURL(t *testing.T) {
 		mockStorage := new(storage.MockBucketStorage)
 		mockStorage.On("GenerateSignedURL", "testfile.jpg").Return("http://signed.url/to/file.jpg", nil) // Set expectation
 
-		service := &services.UserChatRoomService{
+		service := &services.UserChatRoomServiceImpl{
 			MediaStorage: mockStorage,
 		}
 
@@ -453,7 +453,7 @@ func TestGenerateSignedURL(t *testing.T) {
 		mockStorage := new(storage.MockBucketStorage)
 		mockStorage.On("GenerateSignedURL", "testfile.jpg").Return("", fmt.Errorf("url generation error")) // Set expectation
 
-		service := &services.UserChatRoomService{
+		service := &services.UserChatRoomServiceImpl{
 			MediaStorage: mockStorage,
 		}
 
@@ -472,12 +472,12 @@ func TestUploadMediaHandler(t *testing.T) {
 		mockStorage := new(storage.MockBucketStorage)
 		mockStorage.On("UploadFileToBucket", mock.Anything, "testfile.jpg", mock.Anything, mock.Anything).Return("chatrooms/1/09238450934.jpg", nil) // Use mock.Anything for the file and context
 
-		service := services.UserChatRoomService{
+		service := services.UserChatRoomServiceImpl{
 			MediaStorage: mockStorage,
 		}
 
 		router := gin.New()
-		router.POST("/upload", UploadMediaHandler(service))
+		router.POST("/upload", UploadMediaHandler(&service))
 
 		// Create a test request with a file
 		reqBody := &bytes.Buffer{}
@@ -506,12 +506,12 @@ func TestUploadMediaHandler(t *testing.T) {
 		mockStorage := new(storage.MockBucketStorage)
 		mockStorage.On("UploadFileToBucket", mock.Anything, "testfile.jpg", mock.Anything, mock.Anything).Return("", fmt.Errorf("upload error")) // Use mock.Anything for the file and context
 
-		service := services.UserChatRoomService{
+		service := services.UserChatRoomServiceImpl{
 			MediaStorage: mockStorage,
 		}
 
 		router := gin.New()
-		router.POST("/upload", UploadMediaHandler(service))
+		router.POST("/upload", UploadMediaHandler(&service))
 
 		// Create a test request with a file
 		reqBody := &bytes.Buffer{}

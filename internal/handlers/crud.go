@@ -9,7 +9,19 @@ import (
 	"github.com/kontentski/chat/internal/services"
 )
 
-func CreateUser(service *services.UserChatRoomService) gin.HandlerFunc {
+//  CreateUser godoc
+//	@Summary		Create a new user
+//	@Description	creates a new user in the system
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			user	body	models.Users	true	"User information"
+//	@Security		ApiKeyAuth
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	map[string]interface{}
+//	@Failure		500	{object}	map[string]interface{}
+//	@Router			/users [post]
+func CreateUser(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var user models.Users
 
@@ -18,7 +30,7 @@ func CreateUser(service *services.UserChatRoomService) gin.HandlerFunc {
 			return
 		}
 
-		err := service.UserRepo.CreateUser(&user)
+		err := service.CreateUser(&user)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -27,7 +39,17 @@ func CreateUser(service *services.UserChatRoomService) gin.HandlerFunc {
 	}
 }
 
-func GetUserChatRoomsHandler(service services.UserChatRoomService) gin.HandlerFunc {
+//  GetUserChatRooms godoc
+//	@Summary		Get user chat rooms
+//	@Description	retrieve chat rooms for the authenticated user
+//	@Tags			users
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Success		200	{array}		models.ChatRooms
+//	@Failure		401	{object}	map[string]interface{}	"Unauthenticated"
+//	@Failure		500	{object}	map[string]interface{}
+//	@Router			/api/chatrooms [get]
+func GetUserChatRoomsHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		chatRooms, err := service.FetchUserChatRooms(c.Request)
@@ -40,7 +62,18 @@ func GetUserChatRoomsHandler(service services.UserChatRoomService) gin.HandlerFu
 	}
 }
 
-func GetMessagesHandler(service services.UserChatRoomService) gin.HandlerFunc {
+//  GetMessages godoc
+//	@Summary		Get messages
+//	@Description	retrieve messages from a specific chat
+//	@Tags			messages
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Success		200			{array}		models.Messages
+//	@Failure		401			{object}	map[string]interface{}	"Unauthenticated"
+//	@Failure		500			{object}	map[string]interface{}
+//	@Param			chatRoomID	path		int	true	"Chat Room ID"
+//	@Router			/messages/{chatRoomID} [get]
+func GetMessagesHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		messages, err := service.GetMessages(c)
 		if err != nil {
@@ -51,7 +84,20 @@ func GetMessagesHandler(service services.UserChatRoomService) gin.HandlerFunc {
 	}
 }
 
-func DeleteMessageHandler(service *services.UserChatRoomService) gin.HandlerFunc {
+
+//  DeleteMessagesHandler godoc
+//	@Summary		Delete messages
+//	@Description	Deletes selected message
+//	@Tags			messages
+//	@Produce		json
+//	@Param			messageID		path	int	true	"message to delete"
+//	@Param			chat_room_id	query	int	true	"chatroom id"
+//	@Param			userID			query	int	true	"user id"
+//	@Security		ApiKeyAuth
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400,401,500	{object}	map[string]interface{}
+//	@Router			/messages/{messageID} [delete]
+func DeleteMessageHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		response, err := service.DeleteMessage(c)
 		if err != nil {
@@ -76,7 +122,18 @@ func DeleteMessageHandler(service *services.UserChatRoomService) gin.HandlerFunc
 	}
 }
 
-func LeaveTheChatRoomHandler(service *services.UserChatRoomService) gin.HandlerFunc {
+//  LeaveTheChatRoomHandler godoc
+//	@Summaty		Leave the chat room
+//	@Description	Leaves 
+//	@Tags			chatrooms
+//	@Produce		json
+//	@Param			chatRoomID	path	int	true	"chatroom to leave"
+//	@Security		ApiKeyAuth
+//	@Success		200	{object}	map[string]interface{}	"message: User left the chat room successfully"
+//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		500	{object}	map[string]interface{}	"Internal Server Error"
+//	@Router			/api/chatrooms/leave/{chatRoomID} [post]
+func LeaveTheChatRoomHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := service.LeaveChatRoom(c)
 		if err != nil {
@@ -87,7 +144,18 @@ func LeaveTheChatRoomHandler(service *services.UserChatRoomService) gin.HandlerF
 	}
 }
 
-func SearchUsersHandler(service services.UserChatRoomService) gin.HandlerFunc {
+//  SearchUsersHandler godoc
+//	@Summary		Search users
+//	@Description	Search for users by query string
+//	@Tags			users
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@param			q	query		string	true	"Search users"
+//	@Success		200	{array}		services.UsersListResponse
+//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		500	{object}	map[string]interface{}	"Internal Server Error"
+//	@Router			/api/chatrooms/search-users [get]
+func SearchUsersHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		users, err := service.SearchUsers(c)
 		if err != nil {
@@ -99,7 +167,19 @@ func SearchUsersHandler(service services.UserChatRoomService) gin.HandlerFunc {
 	}
 }
 
-func AddUserHandler(service services.UserChatRoomService) gin.HandlerFunc {
+// AddUserHandler godoc
+//	@Summary		Add user to chat room
+//	@Description	Add user to an existing chat room
+//	@Tags			chatrooms
+//	@Accept			json
+//	@Produce		json
+//	@Security		ApiKeyAuth
+//	@Param			request	body		object					true	"Add user request"	
+//	@Success		200		{object}	map[string]interface{}	"message: User added successfully"
+//	@Failure		401		{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		500		{object}	map[string]interface{}	"Internal Server Error"
+//	@Router			/api/chatrooms/add-user [post]
+func AddUserHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := service.AddUserToChatRoom(c)
 		if err != nil {
@@ -111,7 +191,7 @@ func AddUserHandler(service services.UserChatRoomService) gin.HandlerFunc {
 	}
 }
 
-func UploadMediaHandler(service services.UserChatRoomService) gin.HandlerFunc {
+func UploadMediaHandler(service services.ChatRoomService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		filePath, err := service.UploadMedia(c)
 		if err != nil {

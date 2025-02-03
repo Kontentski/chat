@@ -14,7 +14,10 @@ import (
 )
 
 func handleConnection(conn *websocket.Conn) {
+	log.Println("Setting up connection for client")
+
 	conn.SetPongHandler(func(string) error {
+		log.Println("Received pong from client, resetting read deadline")
 		conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
@@ -24,12 +27,16 @@ func handleConnection(conn *websocket.Conn) {
 		defer ticker.Stop()
 
 		for range ticker.C {
+			log.Println("Sending ping to client")
 			conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("Error sending ping: %v", err)
 				return
 			}
 		}
 	}()
+
+	log.Println("Connection setup complete")
 }
 
 func readMessages(conn *websocket.Conn, messageStorage storage.UserRepository) {
@@ -139,7 +146,7 @@ func mapToStruct(data map[string]interface{}, target interface{}) error {
 	return json.Unmarshal(encoded, target)
 }
 
-func handleMessages(service *services.UserChatRoomService) {
+func handleMessages(service services.ChatRoomService) {
 	for msg := range Broadcast {
 
 		if msg.Type == "delete" {

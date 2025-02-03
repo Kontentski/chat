@@ -28,8 +28,10 @@
             </div>
         </div>
         <div id="chat-box-container">
-            <div id="chat-box">
-                <p>Welcome! Select a chat room to start.</p>
+            <div class="chat-box-wrapper"> <!-- New wrapper div -->
+                <div id="chat-box">
+                    <p>Welcome! Select a chat room to start.</p>
+                </div>
             </div>
             <form id="message-form">
                 <input type="text" id="message-input" placeholder="Type your message here...">
@@ -52,7 +54,6 @@
                     uploadFile(file);
                 };
             </script>
-
         </div>
     </div>
     <div id="leave-group-popup" class="popup">
